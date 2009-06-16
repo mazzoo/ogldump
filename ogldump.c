@@ -344,6 +344,51 @@ void do_gl_quad_strip(FILE * f, struct prim_t * prim)
 	}
 }
 
+void do_gl_triangles(FILE * f, struct prim_t * prim)
+{
+	if (!prim) return;
+
+	struct V3_t * p = prim->V3;
+	struct vertex_t   v[3];
+	struct triangle_t t;
+
+	while (p) {
+
+		int i;
+		for (i=0; i<4; i++) {
+
+			if (!p) {
+				printf("!!! ERROR do_gl_quads()\n");
+				exit(1); /* FIXME: be more gracefully */
+			}
+
+			v[i].x = p->v.x;
+			v[i].y = p->v.y;
+			v[i].z = p->v.z;
+
+			p = p->next;
+		}
+
+		t.xn = p->norm->v.x;
+		t.yn = p->norm->v.y;
+		t.zn = p->norm->v.z;
+
+		t.x1 = v[0].x;
+		t.y1 = v[0].y;
+		t.z1 = v[0].z;
+		t.x2 = v[1].x;
+		t.y2 = v[1].y;
+		t.z2 = v[1].z;
+		t.x3 = v[2].x;
+		t.y3 = v[2].y;
+		t.z3 = v[2].z;
+
+		emit_stl_triangle(f, t);
+
+		p = p->next;
+	}
+}
+
 void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 {
 	if (!prim) return;
@@ -369,7 +414,6 @@ void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 		printf("!!! ERROR do_gl_triangle_fan()\n");
 		exit(1); /* FIXME: be more gracefully */
 	}
-//	int n = 0;
 	while (p) {
 		memcpy(&v[1], &v[2], 12);
 		v[2].x = p->v.x;
@@ -390,7 +434,6 @@ void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 		t.y3 = v[2].y;
 		t.z3 = v[2].z;
 
-//		printf("emit_stl_triangle(%d)\n", n++);
 		emit_stl_triangle(f, t);
 
 		p = p->next;
@@ -412,19 +455,18 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 	fwrite(&vertices, 4, 1, f);
 
 	switch(prim->type) {
-#if 1
 		case GL_QUADS:
 			do_gl_quads(f, prim);
 			break;
-#endif
 		case GL_QUAD_STRIP:
 			do_gl_quad_strip(f, prim);
 			break;
-#if 1
+		case GL_TRIANGLES:
+			do_gl_triangles(f, prim);
+			break;
 		case GL_TRIANGLE_FAN:
 			do_gl_triangle_fan(f, prim);
 			break;
-#endif
 		default:
 			printf("!!! FIXME implement type %d / %s\n",
 				prim->type, prim_type_name[prim->type]);
