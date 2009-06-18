@@ -12,7 +12,7 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 
-#define FNAME_PREFIX "/usr/matze/prim"
+#define FNAME_PREFIX "/usr/matze"
 char stl_header[80] =
 	"Hi stranger. I am the STL header, "
 	"my contents are pointless, "
@@ -68,6 +68,34 @@ struct V3_t {
 
 	struct vertex_t v;
 };
+
+struct vertexpointer_t {
+	struct vertexpointer_t  * next;
+
+	/* arguments from glVertexPointer() */
+	GLint                   size;
+	GLenum                  type;
+	GLsizei                 stride;
+	const GLvoid          * ptr;
+
+	void                  * ptr_copy;
+	int                     sizeof_type;
+	int                     max_index;
+	struct triangle_t     * tri;
+} * vertexpointer, * all_vertexpointer;
+
+struct drawelements_t {
+	struct drawelements_t  * next;
+
+	GLenum                   mode;
+	GLsizei                  count;
+	GLenum                   type;
+	GLvoid                 * indices;
+
+	int                      sizeof_type;
+	struct N3_t            * norm;
+	struct vertexpointer_t * vertexpointer;
+} * drawelements, * all_drawelements;
 
 int nPrim = 0;
 struct prim_t {
@@ -155,52 +183,174 @@ void new_N3(
 	norm_last = p;
 }
 
-#if 0
-void dump_prim(int n, struct prim_t * b)
+void copy_vertexpointer(void)
+{
+	struct vertexpointer_t * v = vertexpointer;
+
+	if (!v)
+		return;
+	if (!v->max_index)
+		return;
+	if (!v->ptr)
+		return;
+
+	v->ptr_copy = malloc(v->max_index * v->stride);
+	if (!v->ptr_copy)
+		enomem();
+	memcpy(v->ptr_copy, v->ptr, v->max_index * v->stride);
+}
+
+void new_DrawElements( GLenum mode, GLsizei count,
+		GLenum type, const GLvoid *indices )
 {
 
-	if (b->type != GL_TRIANGLES) {
-		printf("!!! unsupported %s type\n", prim_type_name[b->type]);
+	if (!indices) return;
+	if (indices < (void *)0x08000000) return; /* fuckyou, OpenGL, FUCK FUCK FUCK you, fuck YOU! */
+
+	if (mode != GL_TRIANGLES) {
+		printf("!!! FIXME: support DrawElements() mode %d\n", mode);
 		return;
 	}
 
-	char fnamebuf[256];
-	sprintf(fnamebuf, "%s_%d.stl", FNAME_PREFIX, n);
-	FILE * f = fopen(fnamebuf, "wb");
-	if (!f) {
-		printf("!!! couldn't fopen(%s)\n", fnamebuf);
+	if (type != GL_UNSIGNED_SHORT) {
+		printf("!!! FIXME: support DrawElements() type %d\n", type);
 		return;
 	}
 
-	fwrite(stl_header, 1, 80, f);
-	int vertices = b->nV3 / 4;
-	fwrite(&vertices, 4, 1, f);
+	struct drawelements_t * p = drawelements;
+	struct drawelements_t * p_prev = NULL;
+	if (!p) {
+		p = malloc(sizeof(*p));
+		all_drawelements = p;
+	} else {
+		p->next = malloc(sizeof(*p));
+		p_prev = p;
+		p = p->next;
+	}
+	if (!p) enomem();
+	p->next = NULL;
+	p->norm = norm_last;
 
-	struct V3_t * v = b->V3;
-	int i;
-	while (v) {
-		fwrite(&v->norm->v.x, 1, 4, f);
-		fwrite(&v->norm->v.y, 1, 4, f);
-		fwrite(&v->norm->v.z, 1, 4, f);
-		for (i=0; i<3; i++) {
-			fwrite(&v->v.x, 1, 4, f);
-			fwrite(&v->v.y, 1, 4, f);
-			fwrite(&v->v.z, 1, 4, f);
-			v = v->next;
-			if (!v) {
-				printf("!!! writing %s ended early!\n", fnamebuf);
-				fclose(f);
-				return;
+	p->mode  = mode;
+	p->count = count;
+	p->type  = type;
+
+	p->vertexpointer = vertexpointer;
+
+	switch (mode) {
+		case GL_TRIANGLES:
+			{
+			int sizeof_type = 0;
+			switch (type) {
+				case GL_UNSIGNED_BYTE:
+					sizeof_type = 1;
+					break;
+				case GL_UNSIGNED_SHORT:
+					sizeof_type = 2;
+					break;
+				case GL_UNSIGNED_INT:
+					sizeof_type = 4;
+					break;
+				default:
+					printf("!!! ERROR: glDrawElements() wit unknown type 0x%x\n",
+						type);
+					exit(1);
 			}
-		}
-		uint16_t unused = 0;
-		fwrite(&unused, 1, 2, f);
+			p->sizeof_type = sizeof_type;
+			p->indices = malloc( sizeof_type * count );
+			if (!p->indices) enomem();
+			memcpy(p->indices, indices, sizeof_type * count );
 
-		v = v->next;
-	}
-	fclose(f);
-}
+#if 0
+			printf("indices = { ");
+			int i;
+			for (i=0; i< count; i++) {
+				short * s = p->indices;
+				printf("%d, ", s[i]);
+			}
+			printf(indices = "};\n");
 #endif
+			int i;
+			for (i=0; i<count; i++) {
+				short * s = p->indices;
+				if (s[i] > p->vertexpointer->max_index)
+				{
+					p->vertexpointer->max_index = s[i];
+					//printf("new_max: %d\n", p->vertexpointer->max_index);
+				}
+			}
+
+			break;
+			}
+		default:
+			printf("!!! FIXME: support DrawElements(%s / %d)\n",
+				prim_type_name[mode], mode);
+			free(p);
+			if (p_prev) {
+				p_prev->next = NULL;
+			} else {
+				all_drawelements = NULL;
+			}
+			p = NULL;
+			return;
+	}
+
+	copy_vertexpointer();
+	drawelements = p;
+}
+
+void new_VertexPointer( GLint size, GLenum type,
+		GLsizei stride, const GLvoid *ptr )
+{
+	if (size != 3) {
+		printf("!!! unsupported new_VertexPointer() size %d\n", size);
+		return;
+	}
+	if (type != GL_FLOAT) {
+		printf("!!! unsupported new_VertexPointer() type %d\n", type);
+		return;
+	}
+
+	struct vertexpointer_t * p = vertexpointer;
+
+	if (!p) {
+		p = malloc(sizeof(*p));
+		all_vertexpointer = p;
+	} else {
+		p->next = malloc(sizeof(*p));
+		p = p->next;
+	}
+	if (!p) enomem();
+	p->next = NULL;
+
+	p->size   = size;
+	p->type   = type;
+	p->stride = stride;
+	p->ptr    = ptr;
+
+	p->max_index = 0;
+
+	p->sizeof_type = 0;
+	switch (type) {
+		case GL_SHORT:
+			p->sizeof_type = 2;
+			break;
+		case GL_INT:
+			p->sizeof_type = 4;
+			break;
+		case GL_FLOAT:
+			p->sizeof_type = 4;
+			break;
+		case GL_DOUBLE:
+			p->sizeof_type = 8;
+			break;
+		default:
+			printf("!!! ERROR: unknown type %d in glVertexPointer()\n", type);
+			exit(1);
+	}
+
+	vertexpointer = p;
+}
 
 /**************************************************************/
 /* processing opengl primitives to STL normals and triangles */
@@ -228,10 +378,10 @@ void emit_stl_triangle(FILE * f, struct triangle_t t)
 	fwrite(&unused, 1, 2, f);
 }
 
-void fixup_stl(FILE * f)
+void fixup_stl(FILE * f, int n_triangles)
 {
 	fseek(f, 80, SEEK_SET);
-	fwrite(&n_stl_triangles, 1, 4, f);
+	fwrite(&n_triangles, 1, 4, f);
 	n_stl_triangles = 0;
 }
 
@@ -312,9 +462,6 @@ void do_gl_quad_strip(FILE * f, struct prim_t * prim)
 		printf("!!! ERROR do_gl_quad_strip()\n");
 		exit(1); /* FIXME: be more gracefully */
 	}
-	int n=3;
-	// FIXME where's the off-by-one? the last triangle isn't drawn :(
-	int q=1;
 	while (p) {
 		memcpy(&v[0], &v[1], 12);
 		memcpy(&v[1], &v[2], 12);
@@ -336,10 +483,8 @@ void do_gl_quad_strip(FILE * f, struct prim_t * prim)
 		t.y3 = v[2].y;
 		t.z3 = v[2].z;
 
-		printf("emit_stl_triangle(%d)\n", q++);
 		emit_stl_triangle(f, t);
 
-		printf("got %d v\n", n++);
 		p = p->next;
 	}
 }
@@ -443,7 +588,7 @@ void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 void switch_gl_primitive(int n, struct prim_t * prim)
 {
 	char fnamebuf[256];
-	sprintf(fnamebuf, "%s_%d.stl", FNAME_PREFIX, n);
+	sprintf(fnamebuf, "%s/prim_%d.stl", FNAME_PREFIX, n);
 	FILE * f = fopen(fnamebuf, "wb");
 	if (!f) {
 		printf("!!! couldn't fopen(%s)\n", fnamebuf);
@@ -455,6 +600,11 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 	fwrite(&vertices, 4, 1, f);
 
 	switch(prim->type) {
+#if 0
+		case GL_POINTS:
+			do_gl_quads(f, prim);
+			break;
+#endif
 		case GL_QUADS:
 			do_gl_quads(f, prim);
 			break;
@@ -467,14 +617,112 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 		case GL_TRIANGLE_FAN:
 			do_gl_triangle_fan(f, prim);
 			break;
+#if 0
+		case GL_LINE_LOOP:
+			do_gl_triangle_fan(f, prim);
+			break;
+#endif
 		default:
 			printf("!!! FIXME implement type %d / %s\n",
 				prim->type, prim_type_name[prim->type]);
 	}
-	fixup_stl(f);
+	fixup_stl(f, n_stl_triangles);
 	fclose(f);
 }
 
+void do_file_DrawElements(int n, struct drawelements_t * p)
+{
+	char fnamebuf[256];
+	sprintf(fnamebuf, "%s/drawelements_%d.stl", FNAME_PREFIX, n);
+	FILE * f = fopen(fnamebuf, "wb");
+	if (!f) {
+		printf("!!! couldn't fopen(%s)\n", fnamebuf);
+		return;
+	}
+
+	fwrite(stl_header, 1, 80, f);
+
+	int vertices = 0; /* will be written again by fixup_stl() */
+	fwrite(&vertices, 4, 1, f);
+
+	int n_drawelements = 0;
+	void * pv = p->vertexpointer->ptr_copy;
+
+#if 0
+	static int didd=0;
+	if (didd< 20)
+	{
+		int i;
+		printf("DE stride = %d\n", p->vertexpointer->stride);
+		for (i=0; i<p->vertexpointer->max_index; i++)
+		{
+			if (!(i%(p->vertexpointer->stride/4)))
+				printf("\n");
+			printf("%+4.2f ", ((float *)pv)[i]);
+		}
+
+		didd++;
+		printf("\n");
+	}
+#endif
+	switch (p->mode) {
+		case GL_TRIANGLES:
+			{
+			struct triangle_t t;
+			int stride  = p->vertexpointer->stride / 4;
+			short * ind = p->indices;
+			int i;
+			for (i=0; i<p->count ; i+=3) {
+
+				t.xn = p->norm->v.x;
+				t.yn = p->norm->v.y;
+				t.zn = p->norm->v.z;
+
+				t.x1 = ((float *)pv)[0 + stride*ind[i+0]];
+				t.y1 = ((float *)pv)[1 + stride*ind[i+0]];
+				t.z1 = ((float *)pv)[2 + stride*ind[i+0]];
+				t.x2 = ((float *)pv)[0 + stride*ind[i+1]];
+				t.y2 = ((float *)pv)[1 + stride*ind[i+1]];
+				t.z2 = ((float *)pv)[2 + stride*ind[i+1]];
+				t.x3 = ((float *)pv)[0 + stride*ind[i+2]];
+				t.y3 = ((float *)pv)[1 + stride*ind[i+2]];
+				t.z3 = ((float *)pv)[2 + stride*ind[i+2]];
+
+#if 0
+	if (didd< 20) {
+				printf("emit_stl_triangle %d  %d\n", n, n_drawelements);
+				printf("%+2.2f %+2.2f %+2.2f\n", t.x1, t.y1, t.z1);
+				printf("%+2.2f %+2.2f %+2.2f\n", t.x2, t.y2, t.z2);
+				printf("%+2.2f %+2.2f %+2.2f\n", t.x3, t.y3, t.z3);
+	}
+#endif
+				n_drawelements++;
+				emit_stl_triangle(f, t);
+			}
+			n++;
+			break;
+			} 
+		default:
+			// FIXME
+			printf("!!! FIXME implement DrawElements() mode %d\n", p->mode);
+	}
+
+	fixup_stl(f, n_drawelements);
+	fclose(f);
+}
+
+void do_DrawElements(void)
+{
+	struct drawelements_t * p = all_drawelements;
+	int n = 0;
+	while (p) {
+//		printf("+++ writing DrawElement %d\n", n);
+		do_file_DrawElements(n, p);
+		n++;
+		p = p->next;
+	}
+	printf("+++ wrote a total of %d DrawElements\n", n);
+}
 
 /**************************************************************/
 /* init */
@@ -485,6 +733,7 @@ void ogldump_exit(void)
 	printf("+++ ogldump report\n");
 
 	printf("+++ got %d prims\n", nPrim);
+
 	int n=0;
 	int large=0;
 	struct prim_t * p = all_prims;
@@ -500,6 +749,8 @@ void ogldump_exit(void)
 		p = p->next;
 	}
 
+	do_DrawElements();
+
 	printf("+++ wrote %d large prims\n", large);
 	printf("+++ byebye from ogldump.\n\n");
 }
@@ -512,9 +763,13 @@ static inline void init(void)
 		return;
 	atexit(ogldump_exit);
 
-	all_prims = NULL;
-	norm      = NULL;
-	norm_last = NULL;
+	all_prims         = NULL;
+	norm              = NULL;
+	norm_last         = NULL;
+	drawelements      = NULL;
+	all_drawelements  = NULL;
+	all_vertexpointer = NULL;
+	vertexpointer     = NULL;
 
 	/* an initial default normal */
 	new_N3(0.0, 0.0, 1.0);
@@ -525,13 +780,15 @@ static inline void init(void)
 /**************************************************************/
 /* hijacked functions */
 
-#define DO_2D_VERTEX
-#define DO_3D_VERTEX
-#define DO_4D_VERTEX
+//#define DO_2D_VERTEX
+//#define DO_3D_VERTEX
+//#define DO_4D_VERTEX
 #define DO_3D_NORMAL
+#define DO_DRAW_ELEMENTS
 
 #define glvoid __attribute__((visibility("default"))) void
 
+#if 0
 glvoid glNewList( GLuint list, GLenum mode )
 {
 	init();
@@ -543,7 +800,9 @@ glvoid glNewList( GLuint list, GLenum mode )
 
 	func(list, mode);
 }
+#endif
 
+#if defined DO_2D_VERTEX || defined DO_3D_VERTEX || defined DO_4D_VERTEX
 glvoid glBegin( GLenum mode )
 {
 	init();
@@ -573,6 +832,7 @@ glvoid glEnd( void )
 
 	func();
 }
+#endif
 
 #ifdef DO_2D_VERTEX
 glvoid glVertex2d( GLdouble x, GLdouble y )
@@ -1011,6 +1271,40 @@ glvoid glNormal3sv( const GLshort *v )
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
+}
+#endif
+
+
+#ifdef DO_DRAW_ELEMENTS
+void glVertexPointer( GLint size, GLenum type,
+		GLsizei stride, const GLvoid *ptr )
+{
+	init();
+	static void (*func)(GLint, GLenum, GLsizei, const GLvoid *) = NULL;
+	if (!func)
+		func = (void (*)(GLint, GLenum, GLsizei, const GLvoid *)) dlsym(RTLD_NEXT, "glVertexPointer");
+
+	printf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
+		size, type, stride, (unsigned int) ptr);
+	new_VertexPointer( size, type, stride, ptr);
+
+	func(size, type, stride, ptr);
+}
+
+void glDrawElements( GLenum mode, GLsizei count,
+		GLenum type, const GLvoid *indices )
+{
+	init();
+	static void (*func)(GLenum, GLsizei, GLenum, const GLvoid *) = NULL;
+	if (!func)
+		func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
+
+	printf("glDrawElements(%s, %d, 0x%x, 0x%8.8x);\n",
+		prim_type_name[mode], count, type, (unsigned int) indices);
+
+	new_DrawElements(mode, count, type, indices);
+
+	func(mode, count, type, indices);
 }
 #endif
 
