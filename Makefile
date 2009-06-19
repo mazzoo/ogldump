@@ -1,8 +1,16 @@
-all: ogldump.so
+CFLAGS=-Wall -g
+
+all: ogldump.so stl_scale stl_merge
 
 
 ogldump.so:ogldump.c
-	$(CC) -Wall -g -shared -ldl -o $@ $^
+	$(CC) $(CFLAGS) -shared -ldl -o $@ $^
+
+stl_scale: stl_scale.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+stl_merge: stl_scale
+	ln -s stl_scale stl_merge
 
 clean:
 	rm ogldump.so
