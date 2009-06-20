@@ -1,16 +1,18 @@
 CFLAGS=-Wall -g
 
-all: ogldump.so stl_process
+all: ogldump.so stl_process stl_bin2ascii
 
 
 ogldump.so:ogldump.c
 	$(CC) $(CFLAGS) -shared -ldl -o $@ $^
 
-stl_process: stl_process.c
-	$(CC) $(CFLAGS) $^ -o $@
+#stl_process: stl_process.c
+#	$(CC) $(CFLAGS) $^ -o $@
+#stl_bin2ascii: stl_bin2ascii.c
+#	$(CC) $(CFLAGS) $^ -o $@
 
 clean:
-	rm ogldump.so stl_process
+	rm -f ogldump.so stl_process stl_bin2ascii
 
 test:ogldump.so
 	LD_PRELOAD=$(PWD)/ogldump.so glxgears
