@@ -1,3 +1,15 @@
+/*
+ * stl_bin2ascii.c - convert STL files from binary to ASCII format
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * authors:
+ * (C) 2009  Matthias Wenzel <reprap at mazzoo dot de>
+ *
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
