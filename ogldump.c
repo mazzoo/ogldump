@@ -194,10 +194,10 @@ void copy_vertexpointer(void)
 	if (!v->ptr)
 		return;
 
-	v->ptr_copy = malloc(v->max_index * v->stride);
+	v->ptr_copy = malloc((v->max_index + 1) * v->stride);
 	if (!v->ptr_copy)
 		enomem();
-	memcpy(v->ptr_copy, v->ptr, v->max_index * v->stride);
+	memcpy(v->ptr_copy, v->ptr, (v->max_index + 1) * v->stride);
 }
 
 void new_DrawElements( GLenum mode, GLsizei count,
