@@ -212,6 +212,19 @@ void copy_vertexpointer(void)
 	memcpy(v->ptr_copy, v->ptr, (v->max_index + 1) * v->stride);
 }
 
+void set_max_index_DrawElements(struct drawelements_t * p)
+{
+	int i;
+	for (i=0; i<p->count; i++) {
+		int * s = p->indices;
+		if (s[i] > p->vertexpointer->max_index)
+		{
+			p->vertexpointer->max_index = s[i];
+			//printf("new_max: %d\n", p->vertexpointer->max_index);
+		}
+	}
+}
+
 void new_DrawElements( GLenum mode, GLsizei count,
 		GLenum type, const GLvoid *indices )
 {
@@ -220,12 +233,13 @@ void new_DrawElements( GLenum mode, GLsizei count,
 	if (indices < (void *)0x08000000) return; /* fuckyou, OpenGL, FUCK FUCK FUCK you, fuck YOU! */
 
 	if (mode != GL_TRIANGLES) {
-		printf("!!! FIXME: support DrawElements() mode %d\n", mode);
+		printf("!!! FIXME: support DrawElements(mode %s / 0x%4.4x)\n",
+			prim_type_name[mode], mode);
 		return;
 	}
 
-	if (type != GL_UNSIGNED_SHORT) {
-		printf("!!! FIXME: support DrawElements() type %d\n", type);
+	if ( (type != GL_UNSIGNED_SHORT) || (type != GL_UNSIGNED_INT) ) {
+		printf("!!! FIXME: support DrawElements() type 0x%4.4x\n", type);
 		return;
 	}
 
@@ -273,29 +287,12 @@ void new_DrawElements( GLenum mode, GLsizei count,
 			if (!p->indices) enomem();
 			memcpy(p->indices, indices, sizeof_type * count );
 
-#if 0
-			printf("indices = { ");
-			int i;
-			for (i=0; i< count; i++) {
-				short * s = p->indices;
-				printf("%d, ", s[i]);
-			}
-			printf(indices = "};\n");
-#endif
-			int i;
-			for (i=0; i<count; i++) {
-				short * s = p->indices;
-				if (s[i] > p->vertexpointer->max_index)
-				{
-					p->vertexpointer->max_index = s[i];
-					//printf("new_max: %d\n", p->vertexpointer->max_index);
-				}
-			}
+			set_max_index_DrawElements(p);
 
 			break;
 			}
 		default:
-			printf("!!! FIXME: support DrawElements(%s / %d)\n",
+			printf("!!! FIXME: support DrawElements(%s / 0x%4.4x)\n",
 				prim_type_name[mode], mode);
 			free(p);
 			if (p_prev) {
@@ -635,7 +632,7 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 			break;
 #endif
 		default:
-			printf("!!! FIXME implement type %d / %s\n",
+			printf("!!! FIXME implement gl_primitive type 0x%4.4x / %s\n",
 				prim->type, prim_type_name[prim->type]);
 	}
 	fixup_stl(f, n_stl_triangles);
@@ -682,7 +679,7 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 			{
 			struct triangle_t t;
 			int stride  = p->vertexpointer->stride / 4;
-			short * ind = p->indices;
+			int * ind = p->indices;
 			int i;
 			for (i=0; i<p->count ; i+=3) {
 
@@ -792,10 +789,10 @@ static inline void init(void)
 /**************************************************************/
 /* hijacked functions */
 
-//#define DO_2D_VERTEX
-//#define DO_3D_VERTEX
-//#define DO_4D_VERTEX
-#define DO_3D_NORMAL
+#define DO_2D_VERTEX
+#define DO_3D_VERTEX
+#define DO_4D_VERTEX
+#define DO_3D_NORMAL /* should alway be on */
 #define DO_DRAW_ELEMENTS
 
 #define glvoid __attribute__((visibility("default"))) void
