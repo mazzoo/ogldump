@@ -216,7 +216,7 @@ void set_max_index_DrawElements(struct drawelements_t * p)
 {
 	int i;
 	for (i=0; i<p->count; i++) {
-		int * s = p->indices;
+		short * s = p->indices;
 		if (s[i] > p->vertexpointer->max_index)
 		{
 			p->vertexpointer->max_index = s[i];
@@ -238,7 +238,7 @@ void new_DrawElements( GLenum mode, GLsizei count,
 		return;
 	}
 
-	if ( (type != GL_UNSIGNED_SHORT) || (type != GL_UNSIGNED_INT) ) {
+	if ( (type != GL_UNSIGNED_SHORT) && (type != GL_UNSIGNED_INT) ) {
 		printf("!!! FIXME: support DrawElements() type 0x%4.4x\n", type);
 		return;
 	}
@@ -679,7 +679,7 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 			{
 			struct triangle_t t;
 			int stride  = p->vertexpointer->stride / 4;
-			int * ind = p->indices;
+			short * ind = p->indices;
 			int i;
 			for (i=0; i<p->count ; i+=3) {
 
