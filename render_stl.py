@@ -39,9 +39,9 @@ scn.update(0)
 
 # html
 html = open("stl.html", "w")
-html.write("<html><head><title>some stl files</title></head><body bgcolor=\"#222222\">")
-html.write("<table>")
-html.write("<tr>")
+html.write("<html><head><title>some stl files</title></head><body bgcolor=\"#222222\">\n")
+html.write("<table>\n")
+html.write("<tr>\n")
 
 stl_count = 0
 
@@ -65,17 +65,16 @@ for stl_name in stl_all:
 
 	# html
 	html.write("<td>")
-	html.write("<font color=\"#aaaaaa\">")
+	html.write("<font color=\"#aaaaaa\">\n")
 	html.write("<img src=\"" + stl_name + ".png\">")
-	html.write("<br>")
+	html.write("<br>\n")
 	html.write("[" + str(stl_count) + "] <a href=\"" +  stl_name + "\">" + stl_name.split("/")[-1] + "</a>")
 	html.write("</font>")
-	html.write("</td>")
+	html.write("</td>\n")
 	stl_count = stl_count + 1
-	if stl_count == pics_per_row:
-		stl_count = 0
-		html.write("</tr>")
-		html.write("<tr>")
+	if (stl_count % pics_per_row) == 0:
+		html.write("</tr>\n")
+		html.write("<tr>\n")
 
 #print str(ctx.fps) + " fps"
 #print ctx.cFrame
