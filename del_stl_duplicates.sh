@@ -17,7 +17,7 @@ LAST_HASH="invalid"
 
 while read HASH FILE ; do
 	if [ ${LAST_HASH} == ${HASH} ] ; then
-		echo "removing duplicate ${FILE}"
+#		echo "removing duplicate ${FILE}"
 		rm ${FILE}
 	fi
 	LAST_HASH=${HASH}

@@ -13,16 +13,18 @@
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-//#include <netdb.h>
-//#include <unistd.h>
 #include <string.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <fcntl.h>
 #include <dlfcn.h>
 
 #include <GL/gl.h>
 #include <GL/glx.h>
+
+//#define VERBOSE
+#ifdef VERBOSE
+#  define verbprintf printf
+#else
+#  define verbprintf(x,...)
+#endif
 
 #define FNAME_PREFIX "/usr/matze"
 char stl_header[80] =
@@ -456,7 +458,6 @@ void do_gl_quad_strip(FILE * f, struct prim_t * prim)
 	v[1].x = p->v.x;
 	v[1].y = p->v.y;
 	v[1].z = p->v.z;
-	printf("got 1 v\n");
 	p = p->next;
 	if (!p) {
 		printf("!!! ERROR do_gl_quad_strip()\n");
@@ -465,7 +466,6 @@ void do_gl_quad_strip(FILE * f, struct prim_t * prim)
 	v[2].x = p->v.x;
 	v[2].y = p->v.y;
 	v[2].z = p->v.z;
-	printf("got 2 v\n");
 	p = p->next;
 	if (!p) {
 		printf("!!! ERROR do_gl_quad_strip()\n");
@@ -597,7 +597,7 @@ void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 void switch_gl_primitive(int n, struct prim_t * prim)
 {
 	char fnamebuf[256];
-	sprintf(fnamebuf, "%s/prim_%d.stl", FNAME_PREFIX, n);
+	sprintf(fnamebuf, "%s/prim_%.7d.stl", FNAME_PREFIX, n);
 	FILE * f = fopen(fnamebuf, "wb");
 	if (!f) {
 		printf("!!! couldn't fopen(%s)\n", fnamebuf);
@@ -614,6 +614,7 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 			do_gl_quads(f, prim);
 			break;
 #endif
+#if 1
 		case GL_QUADS:
 			do_gl_quads(f, prim);
 			break;
@@ -626,6 +627,7 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 		case GL_TRIANGLE_FAN:
 			do_gl_triangle_fan(f, prim);
 			break;
+#endif
 #if 0
 		case GL_LINE_LOOP:
 			do_gl_triangle_fan(f, prim);
@@ -642,7 +644,7 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 void do_file_DrawElements(int n, struct drawelements_t * p)
 {
 	char fnamebuf[256];
-	sprintf(fnamebuf, "%s/drawelements_%d.stl", FNAME_PREFIX, n);
+	sprintf(fnamebuf, "%s/drawelements_%.7d.stl", FNAME_PREFIX, n);
 	FILE * f = fopen(fnamebuf, "wb");
 	if (!f) {
 		printf("!!! couldn't fopen(%s)\n", fnamebuf);
@@ -657,23 +659,6 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 	int n_drawelements = 0;
 	void * pv = p->vertexpointer->ptr_copy;
 
-#if 0
-	static int didd=0;
-	if (didd< 20)
-	{
-		int i;
-		printf("DE stride = %d\n", p->vertexpointer->stride);
-		for (i=0; i<p->vertexpointer->max_index; i++)
-		{
-			if (!(i%(p->vertexpointer->stride/4)))
-				printf("\n");
-			printf("%+4.2f ", ((float *)pv)[i]);
-		}
-
-		didd++;
-		printf("\n");
-	}
-#endif
 	switch (p->mode) {
 		case GL_TRIANGLES:
 			{
@@ -697,14 +682,6 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 				t.y3 = ((float *)pv)[1 + stride*ind[i+2]];
 				t.z3 = ((float *)pv)[2 + stride*ind[i+2]];
 
-#if 0
-	if (didd< 20) {
-				printf("emit_stl_triangle %d  %d\n", n, n_drawelements);
-				printf("%+2.2f %+2.2f %+2.2f\n", t.x1, t.y1, t.z1);
-				printf("%+2.2f %+2.2f %+2.2f\n", t.x2, t.y2, t.z2);
-				printf("%+2.2f %+2.2f %+2.2f\n", t.x3, t.y3, t.z3);
-	}
-#endif
 				n_drawelements++;
 				emit_stl_triangle(f, t);
 			}
@@ -805,7 +782,7 @@ glvoid glNewList( GLuint list, GLenum mode )
 	if (!func)
 		func = (void (*)(GLuint, GLenum)) dlsym(RTLD_NEXT, "glNewList");
 
-	printf("glNewList(%d, %d);\n", list, mode);
+	verbprintf("glNewList(%d, %d);\n", list, mode);
 
 	func(list, mode);
 }
@@ -819,11 +796,11 @@ glvoid glBegin( GLenum mode )
 	if (!func)
 		func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glBegin");
 
-	printf("glBegin(%s);", prim_type_name[mode]);
+	verbprintf("glBegin(%s);", prim_type_name[mode]);
 
 	current_prim = new_prim(mode);
 
-	printf(" /* [%d] */\n", nPrim-1);
+	verbprintf(" /* [%d] */\n", nPrim-1);
 
 	func(mode);
 }
@@ -835,7 +812,7 @@ glvoid glEnd( void )
 	if (!func)
 		func = (void (*)(void)) dlsym(RTLD_NEXT, "glEnd");
 
-	printf("glEnd();\n");
+	verbprintf("glEnd();\n");
 
 	current_prim = NULL;
 
@@ -851,7 +828,7 @@ glvoid glVertex2d( GLdouble x, GLdouble y )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex2d");
 
-	printf("glVertex2d(%f, %f);\n", x, y);
+	verbprintf("glVertex2d(%f, %f);\n", x, y);
 
 	func(x, y);
 }
@@ -863,7 +840,7 @@ glvoid glVertex2f( GLfloat x, GLfloat y )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex2f");
 
-	printf("glVertex2f(%f, %f);\n", x, y);
+	verbprintf("glVertex2f(%f, %f);\n", x, y);
 
 	func(x, y);
 }
@@ -875,7 +852,7 @@ glvoid glVertex2i( GLint x, GLint y )
 	if (!func)
 		func = (void (*)(GLint, GLint)) dlsym(RTLD_NEXT, "glVertex2i");
 
-	printf("glVertex2i(%d, %d);\n", x, y);
+	verbprintf("glVertex2i(%d, %d);\n", x, y);
 
 	func(x, y);
 }
@@ -887,7 +864,7 @@ glvoid glVertex2s( GLshort x, GLshort y )
 	if (!func)
 		func = (void (*)(GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex2s");
 
-	printf("glVertex2s(%d, %d);\n", x, y);
+	verbprintf("glVertex2s(%d, %d);\n", x, y);
 
 	func(x, y);
 }
@@ -901,7 +878,7 @@ glvoid glVertex3d( GLdouble x, GLdouble y, GLdouble z )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex3d");
 
-	printf("glVertex3d(%f, %f, %f);\n", x, y, z);
+	verbprintf("glVertex3d(%f, %f, %f);\n", x, y, z);
 	new_V3(x, y, z);
 
 	func(x, y, z);
@@ -914,7 +891,7 @@ glvoid glVertex3f( GLfloat x, GLfloat y, GLfloat z )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex3f");
 
-	printf("glVertex3f(%f, %f, %f);\n", x, y, z);
+	verbprintf("glVertex3f(%f, %f, %f);\n", x, y, z);
 	new_V3(x, y, z);
 
 	func(x, y, z);
@@ -927,7 +904,7 @@ glvoid glVertex3i( GLint x, GLint y, GLint z )
 	if (!func)
 		func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex3i");
 
-	printf("glVertex3i(%d, %d, %d);\n", x, y, z);
+	verbprintf("glVertex3i(%d, %d, %d);\n", x, y, z);
 	new_V3(x, y, z);
 
 	func(x, y, z);
@@ -940,7 +917,7 @@ glvoid glVertex3s( GLshort x, GLshort y, GLshort z )
 	if (!func)
 		func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex3s");
 
-	printf("glVertex3s(%d, %d, %d);\n", x, y, z);
+	verbprintf("glVertex3s(%d, %d, %d);\n", x, y, z);
 	new_V3(x, y, z);
 
 	func(x, y, z);
@@ -955,7 +932,7 @@ glvoid glVertex4d( GLdouble x, GLdouble y, GLdouble z, GLdouble w )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex4d");
 
-	printf("glVertex4d(%f, %f, %f, %f);\n", x, y, z, w);
+	verbprintf("glVertex4d(%f, %f, %f, %f);\n", x, y, z, w);
 
 	func(x, y, z, w);
 }
@@ -967,7 +944,7 @@ glvoid glVertex4f( GLfloat x, GLfloat y, GLfloat z, GLfloat w )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex4f");
 
-	printf("glVertex4f(%f, %f, %f, %f);\n", x, y, z, w);
+	verbprintf("glVertex4f(%f, %f, %f, %f);\n", x, y, z, w);
 
 	func(x, y, z, w);
 }
@@ -979,7 +956,7 @@ glvoid glVertex4i( GLint x, GLint y, GLint z, GLint w )
 	if (!func)
 		func = (void (*)(GLint, GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex4i");
 
-	printf("glVertex4i(%d, %d, %d, %d);\n", x, y, z, w);
+	verbprintf("glVertex4i(%d, %d, %d, %d);\n", x, y, z, w);
 
 	func(x, y, z, w);
 }
@@ -991,7 +968,7 @@ glvoid glVertex4s( GLshort x, GLshort y, GLshort z, GLshort w )
 	if (!func)
 		func = (void (*)(GLshort, GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex4s");
 
-	printf("glVertex4s(%d, %d, %d, %d);\n", x, y, z, w);
+	verbprintf("glVertex4s(%d, %d, %d, %d);\n", x, y, z, w);
 
 	func(x, y, z, w);
 }
@@ -1005,7 +982,7 @@ glvoid glVertex2dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex2dv");
 
-	printf("glVertex2dv(%f, %f);\n", v[0], v[1]);
+	verbprintf("glVertex2dv(%f, %f);\n", v[0], v[1]);
 
 	func(v);
 }
@@ -1017,7 +994,7 @@ glvoid glVertex2fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex2fv");
 
-	printf("glVertex2fv(%f, %f);\n", v[0], v[1]);
+	verbprintf("glVertex2fv(%f, %f);\n", v[0], v[1]);
 
 	func(v);
 }
@@ -1029,7 +1006,7 @@ glvoid glVertex2iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex2iv");
 
-	printf("glVertex2iv(%d, %d);\n", v[0], v[1]);
+	verbprintf("glVertex2iv(%d, %d);\n", v[0], v[1]);
 
 	func(v);
 }
@@ -1041,7 +1018,7 @@ glvoid glVertex2sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex2sv");
 
-	printf("glVertex2sv(%d, %d);\n", v[0], v[1]);
+	verbprintf("glVertex2sv(%d, %d);\n", v[0], v[1]);
 
 	func(v);
 }
@@ -1055,7 +1032,7 @@ glvoid glVertex3dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex3dv");
 
-	printf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+	verbprintf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
 	new_V3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1068,7 +1045,7 @@ glvoid glVertex3fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex3fv");
 
-	printf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+	verbprintf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
 	new_V3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1081,7 +1058,7 @@ glvoid glVertex3iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex3iv");
 
-	printf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+	verbprintf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
 	new_V3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1094,7 +1071,7 @@ glvoid glVertex3sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex3sv");
 
-	printf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+	verbprintf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
 	new_V3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1109,7 +1086,7 @@ glvoid glVertex4dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex4dv");
 
-	printf("glVertex4dv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
+	verbprintf("glVertex4dv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
 
 	func(v);
 }
@@ -1121,7 +1098,7 @@ glvoid glVertex4fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex4fv");
 
-	printf("glVertex4fv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
+	verbprintf("glVertex4fv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
 
 	func(v);
 }
@@ -1133,7 +1110,7 @@ glvoid glVertex4iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex4iv");
 
-	printf("glVertex4iv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
+	verbprintf("glVertex4iv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
 
 	func(v);
 }
@@ -1145,7 +1122,7 @@ glvoid glVertex4sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex4sv");
 
-	printf("glVertex4sv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
+	verbprintf("glVertex4sv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
 
 	func(v);
 }
@@ -1159,7 +1136,7 @@ glvoid glNormal3b( GLbyte x, GLbyte y, GLbyte z )
 	if (!func)
 		func = (void (*)(GLbyte, GLbyte, GLbyte)) dlsym(RTLD_NEXT, "glNormal3b");
 
-	printf("glNormal3b(%d, %d, %d);\n", x, y, z);
+	verbprintf("glNormal3b(%d, %d, %d);\n", x, y, z);
 	new_N3(x, y, z);
 
 	func(x, y, z);
@@ -1172,7 +1149,7 @@ glvoid glNormal3d( GLdouble x, GLdouble y, GLdouble z )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glNormal3d");
 
-	printf("glNormal3d(%f, %f, %f);\n", x, y, z);
+	verbprintf("glNormal3d(%f, %f, %f);\n", x, y, z);
 	new_N3(x, y, z);
 
 	func(x, y, z);
@@ -1185,7 +1162,7 @@ glvoid glNormal3f( GLfloat x, GLfloat y, GLfloat z )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glNormal3f");
 
-	printf("glNormal3f(%f, %f, %f);\n", x, y, z);
+	verbprintf("glNormal3f(%f, %f, %f);\n", x, y, z);
 	new_N3(x, y, z);
 
 	func(x, y, z);
@@ -1198,7 +1175,7 @@ glvoid glNormal3i( GLint x, GLint y, GLint z )
 	if (!func)
 		func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glNormal3i");
 
-	printf("glNormal3i(%d, %d, %d);\n", x, y, z);
+	verbprintf("glNormal3i(%d, %d, %d);\n", x, y, z);
 	new_N3(x, y, z);
 
 	func(x, y, z);
@@ -1211,7 +1188,7 @@ glvoid glNormal3s( GLshort x, GLshort y, GLshort z )
 	if (!func)
 		func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glNormal3s");
 
-	printf("glNormal3s(%d, %d, %d);\n", x, y, z);
+	verbprintf("glNormal3s(%d, %d, %d);\n", x, y, z);
 	new_N3(x, y, z);
 
 	func(x, y, z);
@@ -1224,7 +1201,7 @@ glvoid glNormal3bv( const GLbyte *v )
 	if (!func)
 		func = (void (*)(const GLbyte *)) dlsym(RTLD_NEXT, "glNormal3bv");
 
-	printf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
+	verbprintf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1237,7 +1214,7 @@ glvoid glNormal3dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glNormal3dv");
 
-	printf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+	verbprintf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1250,7 +1227,7 @@ glvoid glNormal3fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glNormal3fv");
 
-	printf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+	verbprintf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1263,7 +1240,7 @@ glvoid glNormal3iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glNormal3iv");
 
-	printf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+	verbprintf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1276,7 +1253,7 @@ glvoid glNormal3sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glNormal3sv");
 
-	printf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+	verbprintf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
 	new_N3(v[0], v[1], v[2]);
 
 	func(v);
@@ -1293,7 +1270,7 @@ void glVertexPointer( GLint size, GLenum type,
 	if (!func)
 		func = (void (*)(GLint, GLenum, GLsizei, const GLvoid *)) dlsym(RTLD_NEXT, "glVertexPointer");
 
-	printf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
+	verbprintf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
 		size, type, stride, (unsigned int) ptr);
 	new_VertexPointer( size, type, stride, ptr);
 
@@ -1308,7 +1285,7 @@ void glDrawElements( GLenum mode, GLsizei count,
 	if (!func)
 		func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
 
-	printf("glDrawElements(%s, %d, 0x%x, 0x%8.8x);\n",
+	verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x);\n",
 		prim_type_name[mode], count, type, (unsigned int) indices);
 
 	new_DrawElements(mode, count, type, indices);
