@@ -94,10 +94,11 @@ struct vertexpointer_t {
 
 	void                  * ptr_copy;
 	int                     sizeof_type;
-	int                     max_index;
+	uint32_t                max_index;
 	struct triangle_t     * tri;
 } * vertexpointer, * all_vertexpointer;
 
+int nDrawElements = 0;
 struct drawelements_t {
 	struct drawelements_t  * next;
 
@@ -218,14 +219,60 @@ void set_max_index_DrawElements(struct drawelements_t * p)
 {
 	int i;
 	for (i=0; i<p->count; i++) {
-		short * s = p->indices;
-		if (s[i] > p->vertexpointer->max_index)
-		{
-			p->vertexpointer->max_index = s[i];
-			//printf("new_max: %d\n", p->vertexpointer->max_index);
+		uint16_t * s16 = p->indices;
+		uint32_t * s32 = p->indices;
+		switch (p->type){
+		case GL_UNSIGNED_SHORT:
+			if (s16[i] > p->vertexpointer->max_index)
+			{
+				p->vertexpointer->max_index = s16[i];
+//				printf("new_max: %d\n", p->vertexpointer->max_index);
+			}
+			break;
+		case GL_UNSIGNED_INT:
+			if (s32[i] > p->vertexpointer->max_index)
+			{
+				p->vertexpointer->max_index = s32[i];
+//				printf("new_max: %d\n", p->vertexpointer->max_index);
+			}
+			break;
+		default:
+			printf("!!! FIXME: support DrawElements() type 0x%4.4x\n",
+				p->type);
 		}
+
 	}
 }
+
+void dump_de()
+{
+	struct drawelements_t * p = drawelements;
+
+	uint32_t * ind = p->indices;
+	int i;
+	printf("drawelements type 0x%4.4x, mode 0x%4.4x, sizeof_type %d\n",
+		p->type, p->mode, p->sizeof_type);
+	printf("indices:\n");
+	for (i=0; i<p->count; i++){
+		printf("%8.8x ", ind[i]);
+		if ((i%8)==7)
+			printf("\n");
+	}
+	printf("\n");
+	struct vertexpointer_t * vp = p->vertexpointer;
+	printf("vertexpointer size %d, type 0x%4.4x, stride %d, sizeof_type %d, max_index 0x%8.8x\n",
+		vp->size, vp->type, vp->stride, vp->sizeof_type, vp->max_index);
+	printf("\n");
+	printf("\n");
+	return;
+	float * f = vp->ptr_copy;
+	for (i=0; i<p->count; i++){
+		printf("%2.3e ", f[ind[i]]);
+		if ((i%8)==7)
+			printf("\n");
+	}
+}
+
 
 void new_DrawElements( GLenum mode, GLsizei count,
 		GLenum type, const GLvoid *indices )
@@ -241,6 +288,7 @@ void new_DrawElements( GLenum mode, GLsizei count,
 	}
 
 	if ( (type != GL_UNSIGNED_SHORT) && (type != GL_UNSIGNED_INT) ) {
+//LALA	if ( type != GL_UNSIGNED_INT) {
 		printf("!!! FIXME: support DrawElements() type 0x%4.4x\n", type);
 		return;
 	}
@@ -307,7 +355,9 @@ void new_DrawElements( GLenum mode, GLsizei count,
 	}
 
 	copy_vertexpointer();
+	nDrawElements++;
 	drawelements = p;
+//	dump_de();
 }
 
 void new_VertexPointer( GLint size, GLenum type,
@@ -336,8 +386,8 @@ void new_VertexPointer( GLint size, GLenum type,
 
 	p->size   = size;
 	p->type   = type;
-	p->stride = stride;
 	p->ptr    = ptr;
+	p->stride = stride;
 
 	p->max_index = 0;
 
@@ -361,6 +411,10 @@ void new_VertexPointer( GLint size, GLenum type,
 	}
 
 	vertexpointer = p;
+	/* a stride of 0 means tightly packed, we prefer a correct stride value */
+	if (p->stride == 0){
+		p->stride = p->sizeof_type * p->size;
+	}
 }
 
 /**************************************************************/
@@ -409,9 +463,11 @@ void do_gl_quads(FILE * f, struct prim_t * prim)
 	struct triangle_t t;
 
 	while (p) {
+
 		t.xn = p->norm->v.x;
 		t.yn = p->norm->v.y;
 		t.zn = p->norm->v.z;
+
 		for (i=0; i<4; i++) {
 
 			if (!p) {
@@ -506,13 +562,20 @@ void do_gl_triangles(FILE * f, struct prim_t * prim)
 	struct vertex_t   v[3];
 	struct triangle_t t;
 
+	int n_tri = 0;
+
 	while (p) {
 
+		t.xn = p->norm->v.x;
+		t.yn = p->norm->v.y;
+		t.zn = p->norm->v.z;
+
 		int i;
-		for (i=0; i<4; i++) {
+		for (i=0; i<3; i++) {
 
 			if (!p) {
-				printf("!!! ERROR do_gl_quads()\n");
+				printf("!!! ERROR do_gl_triangles(): i=%d n_tri=%d\n",
+					i, n_tri);
 				exit(1); /* FIXME: be more gracefully */
 			}
 
@@ -522,10 +585,6 @@ void do_gl_triangles(FILE * f, struct prim_t * prim)
 
 			p = p->next;
 		}
-
-		t.xn = p->norm->v.x;
-		t.yn = p->norm->v.y;
-		t.zn = p->norm->v.z;
 
 		t.x1 = v[0].x;
 		t.y1 = v[0].y;
@@ -539,7 +598,9 @@ void do_gl_triangles(FILE * f, struct prim_t * prim)
 
 		emit_stl_triangle(f, t);
 
-		p = p->next;
+		if (p)
+			p = p->next;
+		n_tri++;
 	}
 }
 
@@ -664,7 +725,8 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 			{
 			struct triangle_t t;
 			int stride  = p->vertexpointer->stride / 4;
-			short * ind = p->indices;
+			uint16_t * ind16 = p->indices;
+			uint32_t * ind32 = p->indices;
 			int i;
 			for (i=0; i<p->count ; i+=3) {
 
@@ -672,15 +734,33 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 				t.yn = p->norm->v.y;
 				t.zn = p->norm->v.z;
 
-				t.x1 = ((float *)pv)[0 + stride*ind[i+0]];
-				t.y1 = ((float *)pv)[1 + stride*ind[i+0]];
-				t.z1 = ((float *)pv)[2 + stride*ind[i+0]];
-				t.x2 = ((float *)pv)[0 + stride*ind[i+1]];
-				t.y2 = ((float *)pv)[1 + stride*ind[i+1]];
-				t.z2 = ((float *)pv)[2 + stride*ind[i+1]];
-				t.x3 = ((float *)pv)[0 + stride*ind[i+2]];
-				t.y3 = ((float *)pv)[1 + stride*ind[i+2]];
-				t.z3 = ((float *)pv)[2 + stride*ind[i+2]];
+				switch (p->type){
+				case GL_UNSIGNED_SHORT:
+					t.x1 = ((float *)pv)[0 + stride * ind16[i+0]];
+					t.y1 = ((float *)pv)[1 + stride * ind16[i+0]];
+					t.z1 = ((float *)pv)[2 + stride * ind16[i+0]];
+					t.x2 = ((float *)pv)[0 + stride * ind16[i+1]];
+					t.y2 = ((float *)pv)[1 + stride * ind16[i+1]];
+					t.z2 = ((float *)pv)[2 + stride * ind16[i+1]];
+					t.x3 = ((float *)pv)[0 + stride * ind16[i+2]];
+					t.y3 = ((float *)pv)[1 + stride * ind16[i+2]];
+					t.z3 = ((float *)pv)[2 + stride * ind16[i+2]];
+					break;
+				case GL_UNSIGNED_INT:
+					t.x1 = ((float *)pv)[0 + stride * ind32[i+0]];
+					t.y1 = ((float *)pv)[1 + stride * ind32[i+0]];
+					t.z1 = ((float *)pv)[2 + stride * ind32[i+0]];
+					t.x2 = ((float *)pv)[0 + stride * ind32[i+1]];
+					t.y2 = ((float *)pv)[1 + stride * ind32[i+1]];
+					t.z2 = ((float *)pv)[2 + stride * ind32[i+1]];
+					t.x3 = ((float *)pv)[0 + stride * ind32[i+2]];
+					t.y3 = ((float *)pv)[1 + stride * ind32[i+2]];
+					t.z3 = ((float *)pv)[2 + stride * ind32[i+2]];
+					break;
+				default:
+					printf("!!! FIXME: support DrawElements() type 0x%4.4x\n",
+						p->type);
+				}
 
 				n_drawelements++;
 				emit_stl_triangle(f, t);
@@ -693,6 +773,7 @@ void do_file_DrawElements(int n, struct drawelements_t * p)
 			printf("!!! FIXME implement DrawElements() mode %d\n", p->mode);
 	}
 
+	printf("+++ drawelement %d has %d triangles\n", n, n_stl_triangles);
 	fixup_stl(f, n_drawelements);
 	fclose(f);
 }
@@ -737,7 +818,7 @@ void ogldump_exit(void)
 
 	do_DrawElements();
 
-	printf("+++ wrote %d large prims\n", large);
+	printf("+++ wrote a total of %d prims\n", large);
 	printf("+++ byebye from ogldump.\n\n");
 }
 
@@ -766,9 +847,9 @@ static inline void init(void)
 /**************************************************************/
 /* hijacked functions */
 
-#define DO_2D_VERTEX
-#define DO_3D_VERTEX
-#define DO_4D_VERTEX
+//#define DO_2D_VERTEX
+//#define DO_3D_VERTEX
+//#define DO_4D_VERTEX
 #define DO_3D_NORMAL /* should alway be on */
 #define DO_DRAW_ELEMENTS
 
@@ -1285,8 +1366,8 @@ void glDrawElements( GLenum mode, GLsizei count,
 	if (!func)
 		func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
 
-	verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x);\n",
-		prim_type_name[mode], count, type, (unsigned int) indices);
+	verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x); /* [%d] */\n",
+		prim_type_name[mode], count, type, (unsigned int) indices, nDrawElements);
 
 	new_DrawElements(mode, count, type, indices);
 
