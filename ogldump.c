@@ -847,9 +847,9 @@ static inline void init(void)
 /**************************************************************/
 /* hijacked functions */
 
-//#define DO_2D_VERTEX
-//#define DO_3D_VERTEX
-//#define DO_4D_VERTEX
+#define DO_2D_VERTEX
+#define DO_3D_VERTEX
+#define DO_4D_VERTEX
 #define DO_3D_NORMAL /* should alway be on */
 #define DO_DRAW_ELEMENTS
 

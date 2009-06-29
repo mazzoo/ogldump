@@ -39,7 +39,11 @@ scn.update(0)
 
 # html
 html = open("stl.html", "w")
-html.write("<html><head><title>some stl files</title></head><body bgcolor=\"#222222\">\n")
+html.write("<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\"\n")
+html.write("\"http://www.w3.org/TR/html4/loose.dtd\">\n")
+html.write("<html><head><title>some stl files</title>\n")
+html.write("<meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\">\n")
+html.write("</head><body bgcolor=\"#222222\">\n")
 html.write("<table>\n")
 html.write("<tr>\n")
 
@@ -66,7 +70,7 @@ for stl_name in stl_all:
 	# html
 	html.write("<td>")
 	html.write("<font color=\"#aaaaaa\">\n")
-	html.write("<img src=\"" + stl_name + ".png\">")
+	html.write("<img src=\"" + stl_name + ".png\" alt=\"" + stl_name + ".png\">")
 	html.write("<br>\n")
 	html.write("[" + str(stl_count) + "] <a href=\"" +  stl_name + "\">" + stl_name.split("/")[-1] + "</a>")
 	html.write("</font>")
