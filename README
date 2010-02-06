@@ -1,0 +1,78 @@
+ogldump - record OpenGL calls of any application using OpenGL and export
+          the 3d mesh models to STL
+
+authors
+~~~~~~~
+
+	(c) 2009 Matthias Wenzel (reprap /a/ mazzoo /./ de)
+
+
+license
+~~~~~~~
+
+	GPLv2. see file LICENSE
+
+
+installation
+~~~~~~~~~~~~
+
+	type "make"
+
+
+running
+~~~~~~~
+
+	tpye "export LD_PRELOAD=$PWD/ogldump.so".
+	run your favorite OpenGL application.
+	get the object you want to rip in front of your eyes.
+	exit the app gracefully (don't kill it, press ctrl-c or alike)
+	a huge amount of .stl files will be generated - as ogldump
+	doesn't check for redundancy, so there are likely many duplicates
+	in your newly generated .stl files. to remove them run the script
+	del_stl_duplicates.sh
+
+
+STL tools
+~~~~~~~~~
+
+	stl_process [options] inputfile(s).stl
+		will always output a single out.stl file, combining one or
+		multiple stl input files.
+
+		options:
+		-s factor : scale output by factor
+		-x x_off  : when merging, add x_off per input file in the output
+		-y y_off  : when merging, add y_off per input file in the output
+		-z z_off  : when merging, add z_off per input file in the output
+		-h        : show help
+
+
+	stl_bin2ascii inputfile.stl
+		convert inputfile.stl in binary STL format to an
+		ascii formatted stl, emitted on stdout
+
+
+	del_stl_duplicates.sh
+		removes .stl duplicates (identical files) in the $PWD
+
+	render_stl.py
+		a blender script to render a large number of .stl files to a
+		html website with png images. use liek this:
+		RENDER_STL="`echo ${PWD}/data/*.stl`" blender -P render_stl.py
+
+
+TODO
+~~~~
+	wrap more OpenGL functions
+	wrap even more OpenGL functions
+	write a wrapper program for the LD_PRELOAD stuff
+	add options to select which OpenGL functions to wrap
+	add stuff to trigger/start/stop recordings and/or single frames only
+	profile!
+
+
+BUGS
+~~~~
+sauerbraten:
+!!! unsupported new_VertexPointer() type 5122
+
