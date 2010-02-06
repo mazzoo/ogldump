@@ -26,7 +26,7 @@
 #  define verbprintf(x,...)
 #endif
 
-#define FNAME_PREFIX "/usr/matze"
+#define FNAME_PREFIX "/home/matze/CODE/ogldump/data"
 char stl_header[80] =
 	"Hi stranger. I am the STL header, "
 	"my contents are pointless, "
@@ -367,7 +367,9 @@ void new_VertexPointer( GLint size, GLenum type,
 		printf("!!! unsupported new_VertexPointer() size %d\n", size);
 		return;
 	}
-	if (type != GL_FLOAT) {
+	if ( (type != GL_FLOAT) &&
+	     (type != GL_SHORT) )
+	{
 		printf("!!! unsupported new_VertexPointer() type %d\n", type);
 		return;
 	}
@@ -604,6 +606,58 @@ void do_gl_triangles(FILE * f, struct prim_t * prim)
 	}
 }
 
+void do_gl_triangle_strip(FILE * f, struct prim_t * prim)
+{
+	if (!prim) return;
+
+	struct V3_t * p = prim->V3;
+	struct vertex_t   v[3];
+	struct triangle_t t;
+
+	/* get 1st two vertices */
+	v[0].x = p->v.x;
+	v[0].y = p->v.y;
+	v[0].z = p->v.z;
+	p = p->next;
+	if (!p) {
+		printf("!!! ERROR do_gl_triangle_strip()\n");
+		exit(1); /* FIXME: be more gracefully */
+	}
+	v[1].x = p->v.x;
+	v[1].y = p->v.y;
+	v[1].z = p->v.z;
+	p = p->next;
+	if (!p) {
+		printf("!!! ERROR do_gl_triangle_strip()\n");
+		exit(1); /* FIXME: be more gracefully */
+	}
+	while (p) {
+		memcpy(&v[0], &v[1], 12); // only diff to do_gl_triangle_fan()
+		memcpy(&v[1], &v[2], 12);
+		v[2].x = p->v.x;
+		v[2].y = p->v.y;
+		v[2].z = p->v.z;
+
+		t.xn = p->norm->v.x;
+		t.yn = p->norm->v.y;
+		t.zn = p->norm->v.z;
+
+		t.x1 = v[0].x;
+		t.y1 = v[0].y;
+		t.z1 = v[0].z;
+		t.x2 = v[1].x;
+		t.y2 = v[1].y;
+		t.z2 = v[1].z;
+		t.x3 = v[2].x;
+		t.y3 = v[2].y;
+		t.z3 = v[2].z;
+
+		emit_stl_triangle(f, t);
+
+		p = p->next;
+	}
+}
+
 void do_gl_triangle_fan(FILE * f, struct prim_t * prim)
 {
 	if (!prim) return;
@@ -685,6 +739,8 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 		case GL_TRIANGLES:
 			do_gl_triangles(f, prim);
 			break;
+		case GL_TRIANGLE_STRIP:
+			do_gl_triangle_strip(f, prim);
 		case GL_TRIANGLE_FAN:
 			do_gl_triangle_fan(f, prim);
 			break;
