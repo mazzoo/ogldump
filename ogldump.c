@@ -1438,7 +1438,7 @@ const GLubyte * glGetString( GLenum name )
 	init();
 	static const GLubyte * (*func)(GLenum) = NULL;
 	if (!func)
-		func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glDrawElements");
+		func = (const GLubyte * (*)(GLenum)) dlsym(RTLD_NEXT, "glDrawElements");
 
 	verbprintf("glGetString( %d );\n", name);
 
