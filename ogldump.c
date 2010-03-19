@@ -742,6 +742,7 @@ void switch_gl_primitive(int n, struct prim_t * prim)
 		case GL_TRIANGLE_STRIP:
 			do_gl_triangle_strip(f, prim);
 		case GL_TRIANGLE_FAN:
+		case GL_POLYGON:
 			do_gl_triangle_fan(f, prim);
 			break;
 #endif
