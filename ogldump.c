@@ -1431,3 +1431,26 @@ void glDrawElements( GLenum mode, GLsizei count,
 }
 #endif
 
+/* omit Vertec Buffer Objects by returning an incompatible version  */
+/* FIXME it's a dirty hack, supporting VBOs would be the real thing */
+const GLubyte * glGetString( GLenum name )
+{
+	init();
+	static const GLubyte * (*func)(GLenum) = NULL;
+	if (!func)
+		func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glDrawElements");
+
+	verbprintf("glGetString( %d );\n", name);
+
+	switch (name){
+		case GL_EXTENSIONS:
+			return "";
+			break;
+		case GL_VERSION:
+			return "1.2";
+			break;
+		default:
+			return func(name);
+	}
+}
+

@@ -1,4 +1,4 @@
-ogldump - record OpenGL calls of any application using OpenGL and export
+ogldump - record OpenGL calls of any application and export
           the 3d mesh models to STL
 
 authors
@@ -23,7 +23,8 @@ running
 ~~~~~~~
 
 	tpye "export LD_PRELOAD=$PWD/ogldump.so".
-	run your favorite OpenGL application.
+	run your favorite OpenGL application. For starters you may want to
+	try glxgears.
 	get the object you want to rip in front of your eyes.
 	exit the app gracefully (don't kill it, press ctrl-c or alike)
 	a huge amount of .stl files will be generated - as ogldump
@@ -57,7 +58,7 @@ STL tools
 
 	render_stl.py
 		a blender script to render a large number of .stl files to a
-		html website with png images. use liek this:
+		html website with png images. use like this:
 		RENDER_STL="`echo ${PWD}/data/*.stl`" blender -P render_stl.py
 
 
