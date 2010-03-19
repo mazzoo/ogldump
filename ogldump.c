@@ -1444,10 +1444,10 @@ const GLubyte * glGetString( GLenum name )
 
 	switch (name){
 		case GL_EXTENSIONS:
-			return "";
+			return (const GLubyte *) "";
 			break;
 		case GL_VERSION:
-			return "1.2";
+			return (const GLubyte *) "1.2";
 			break;
 		default:
 			return func(name);
