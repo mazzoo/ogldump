@@ -12,12 +12,16 @@
 
 #define _GNU_SOURCE
 #include <stdio.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dlfcn.h>
 
 #include <GL/gl.h>
 #include <GL/glx.h>
+
+#define DUMP_COUNT 5000
+static uint32_t dump_count = 0;
 
 //#define VERBOSE
 #ifdef VERBOSE
@@ -288,7 +292,6 @@ void new_DrawElements( GLenum mode, GLsizei count,
 	}
 
 	if ( (type != GL_UNSIGNED_SHORT) && (type != GL_UNSIGNED_INT) ) {
-//LALA	if ( type != GL_UNSIGNED_INT) {
 		printf("!!! FIXME: support DrawElements() type 0x%4.4x\n", type);
 		return;
 	}
@@ -862,8 +865,8 @@ void ogldump_exit(void)
 	int large=0;
 	struct prim_t * p = all_prims;
 	while (p) {
-//		if (p->nV3 > 256) {
-		if (p->nV3 > 0) {
+		if (p->nV3 > 256) {
+//		if (p->nV3 > 0) {
 			printf("+++ prim %d has %d vertices\n", n, p->nV3);
 			large++;
 			//dump_prim(n, p);
@@ -877,6 +880,14 @@ void ogldump_exit(void)
 
 	printf("+++ wrote a total of %d prims\n", large);
 	printf("+++ byebye from ogldump.\n\n");
+}
+
+void sig_usr2_handler(int s)
+{
+	if (s != SIGUSR2)
+		return;
+	if (!dump_count)
+		dump_count = DUMP_COUNT;
 }
 
 static int is_initialized = 0;
@@ -898,15 +909,54 @@ static inline void init(void)
 	/* an initial default normal */
 	new_N3(0.0, 0.0, 1.0);
 
+	sighandler_t rets = signal(SIGUSR2, sig_usr2_handler);
+	if (rets == SIG_ERR)
+		printf("!!! installing sig_usr2_handler() failed\n");
+	else
+		printf("+++ installed sig_usr2_handler()\n");
+
 	is_initialized++;
 }
 
 /**************************************************************/
 /* hijacked functions */
 
-#define DO_2D_VERTEX
+#if 0
+int __libc_start_main(
+	int *(main) (int, char * *, char * *),
+	int argc,
+	char * * ubp_av,
+	void (*init) (void),
+	void (*fini) (void),
+	void (*rtld_fini) (void),
+	void (* stack_end)
+)
+{
+	init();
+}
+#endif
+
+#if 0
+sighandler_t signal(int signum, sighandler_t handler)
+{
+	static sighandler_t (*func)(int, sighandler_t) = NULL;
+	if (!func)
+		func = (sighandler_t (*)(int, sighandler_t)) dlsym(RTLD_NEXT, "signal");
+
+	if (signum == SIGUSR2)
+	{
+		printf("+++ recording %d OpenGL calls\n", DUMP_COUNT);
+		init();
+		dump_count = DUMP_COUNT;
+	}else
+		return func(signum, handler);
+}
+#endif
+
+
+//#define DO_2D_VERTEX
 #define DO_3D_VERTEX
-#define DO_4D_VERTEX
+//#define DO_4D_VERTEX
 #define DO_3D_NORMAL /* should alway be on */
 #define DO_DRAW_ELEMENTS
 
@@ -934,11 +984,15 @@ glvoid glBegin( GLenum mode )
 	if (!func)
 		func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glBegin");
 
-	verbprintf("glBegin(%s);", prim_type_name[mode]);
+	if (dump_count)
+	{
+		verbprintf("glBegin(%s);", prim_type_name[mode]);
 
-	current_prim = new_prim(mode);
+		current_prim = new_prim(mode);
 
-	verbprintf(" /* [%d] */\n", nPrim-1);
+		verbprintf(" /* [%d] */\n", nPrim-1);
+		dump_count--;
+	}
 
 	func(mode);
 }
@@ -950,9 +1004,13 @@ glvoid glEnd( void )
 	if (!func)
 		func = (void (*)(void)) dlsym(RTLD_NEXT, "glEnd");
 
-	verbprintf("glEnd();\n");
+	if (dump_count)
+	{
+		verbprintf("glEnd();\n");
 
-	current_prim = NULL;
+		current_prim = NULL;
+		dump_count--;
+	}
 
 	func();
 }
@@ -1016,8 +1074,12 @@ glvoid glVertex3d( GLdouble x, GLdouble y, GLdouble z )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex3d");
 
-	verbprintf("glVertex3d(%f, %f, %f);\n", x, y, z);
-	new_V3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glVertex3d(%f, %f, %f);\n", x, y, z);
+		new_V3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1029,8 +1091,12 @@ glvoid glVertex3f( GLfloat x, GLfloat y, GLfloat z )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex3f");
 
-	verbprintf("glVertex3f(%f, %f, %f);\n", x, y, z);
-	new_V3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glVertex3f(%f, %f, %f);\n", x, y, z);
+		new_V3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1042,8 +1108,12 @@ glvoid glVertex3i( GLint x, GLint y, GLint z )
 	if (!func)
 		func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex3i");
 
-	verbprintf("glVertex3i(%d, %d, %d);\n", x, y, z);
-	new_V3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glVertex3i(%d, %d, %d);\n", x, y, z);
+		new_V3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1055,8 +1125,12 @@ glvoid glVertex3s( GLshort x, GLshort y, GLshort z )
 	if (!func)
 		func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex3s");
 
-	verbprintf("glVertex3s(%d, %d, %d);\n", x, y, z);
-	new_V3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glVertex3s(%d, %d, %d);\n", x, y, z);
+		new_V3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1170,8 +1244,12 @@ glvoid glVertex3dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex3dv");
 
-	verbprintf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
-	new_V3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+		new_V3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1183,8 +1261,12 @@ glvoid glVertex3fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex3fv");
 
-	verbprintf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
-	new_V3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+		new_V3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1196,8 +1278,12 @@ glvoid glVertex3iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex3iv");
 
-	verbprintf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
-	new_V3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+		new_V3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1209,8 +1295,12 @@ glvoid glVertex3sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex3sv");
 
-	verbprintf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
-	new_V3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+		new_V3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1274,8 +1364,12 @@ glvoid glNormal3b( GLbyte x, GLbyte y, GLbyte z )
 	if (!func)
 		func = (void (*)(GLbyte, GLbyte, GLbyte)) dlsym(RTLD_NEXT, "glNormal3b");
 
-	verbprintf("glNormal3b(%d, %d, %d);\n", x, y, z);
-	new_N3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glNormal3b(%d, %d, %d);\n", x, y, z);
+		new_N3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1287,8 +1381,12 @@ glvoid glNormal3d( GLdouble x, GLdouble y, GLdouble z )
 	if (!func)
 		func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glNormal3d");
 
-	verbprintf("glNormal3d(%f, %f, %f);\n", x, y, z);
-	new_N3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glNormal3d(%f, %f, %f);\n", x, y, z);
+		new_N3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1300,8 +1398,12 @@ glvoid glNormal3f( GLfloat x, GLfloat y, GLfloat z )
 	if (!func)
 		func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glNormal3f");
 
-	verbprintf("glNormal3f(%f, %f, %f);\n", x, y, z);
-	new_N3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glNormal3f(%f, %f, %f);\n", x, y, z);
+		new_N3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1313,8 +1415,12 @@ glvoid glNormal3i( GLint x, GLint y, GLint z )
 	if (!func)
 		func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glNormal3i");
 
-	verbprintf("glNormal3i(%d, %d, %d);\n", x, y, z);
-	new_N3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glNormal3i(%d, %d, %d);\n", x, y, z);
+		new_N3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1326,8 +1432,12 @@ glvoid glNormal3s( GLshort x, GLshort y, GLshort z )
 	if (!func)
 		func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glNormal3s");
 
-	verbprintf("glNormal3s(%d, %d, %d);\n", x, y, z);
-	new_N3(x, y, z);
+	if (dump_count)
+	{
+		verbprintf("glNormal3s(%d, %d, %d);\n", x, y, z);
+		new_N3(x, y, z);
+		dump_count--;
+	}
 
 	func(x, y, z);
 }
@@ -1339,8 +1449,12 @@ glvoid glNormal3bv( const GLbyte *v )
 	if (!func)
 		func = (void (*)(const GLbyte *)) dlsym(RTLD_NEXT, "glNormal3bv");
 
-	verbprintf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
-	new_N3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
+		new_N3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1352,8 +1466,12 @@ glvoid glNormal3dv( const GLdouble *v )
 	if (!func)
 		func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glNormal3dv");
 
-	verbprintf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
-	new_N3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+		new_N3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1365,8 +1483,12 @@ glvoid glNormal3fv( const GLfloat *v )
 	if (!func)
 		func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glNormal3fv");
 
-	verbprintf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
-	new_N3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+		new_N3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1378,8 +1500,12 @@ glvoid glNormal3iv( const GLint *v )
 	if (!func)
 		func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glNormal3iv");
 
-	verbprintf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
-	new_N3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+		new_N3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1391,8 +1517,12 @@ glvoid glNormal3sv( const GLshort *v )
 	if (!func)
 		func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glNormal3sv");
 
-	verbprintf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
-	new_N3(v[0], v[1], v[2]);
+	if (dump_count)
+	{
+		verbprintf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+		new_N3(v[0], v[1], v[2]);
+		dump_count--;
+	}
 
 	func(v);
 }
@@ -1408,9 +1538,13 @@ void glVertexPointer( GLint size, GLenum type,
 	if (!func)
 		func = (void (*)(GLint, GLenum, GLsizei, const GLvoid *)) dlsym(RTLD_NEXT, "glVertexPointer");
 
-	verbprintf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
-		size, type, stride, (unsigned int) ptr);
-	new_VertexPointer( size, type, stride, ptr);
+	if (dump_count)
+	{
+		verbprintf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
+				size, type, stride, (unsigned int) ptr);
+		new_VertexPointer( size, type, stride, ptr);
+		dump_count--;
+	}
 
 	func(size, type, stride, ptr);
 }
@@ -1423,10 +1557,14 @@ void glDrawElements( GLenum mode, GLsizei count,
 	if (!func)
 		func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
 
-	verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x); /* [%d] */\n",
-		prim_type_name[mode], count, type, (unsigned int) indices, nDrawElements);
+	if (dump_count)
+	{
+		verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x); /* [%d] */\n",
+				prim_type_name[mode], count, type, (unsigned int) indices, nDrawElements);
 
-	new_DrawElements(mode, count, type, indices);
+		new_DrawElements(mode, count, type, indices);
+		dump_count--;
+	}
 
 	func(mode, count, type, indices);
 }
@@ -1445,9 +1583,13 @@ const GLubyte * glGetString( GLenum name )
 
 	switch (name){
 		case GL_EXTENSIONS:
+			verbprintf("\tGL_EXTENSIONS:we return \"\" instead of %s\n",
+					func(name));
 			return (const GLubyte *) "";
 			break;
 		case GL_VERSION:
+			verbprintf("\tGL_VERSION: we return \"\" instead of %s\n",
+					func(name));
 			return (const GLubyte *) "1.2";
 			break;
 		default:

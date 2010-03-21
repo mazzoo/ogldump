@@ -26,8 +26,11 @@ running
 	run your favorite OpenGL application. For starters you may want to
 	try glxgears.
 	get the object you want to rip in front of your eyes.
+	you can now trigger recording 5000 OpenGL calls by sending a
+	USR2 signal to the application, e.g.
+	  killall -USR2 sauerbraten
 	exit the app gracefully (don't kill it, press ctrl-c or alike)
-	a huge amount of .stl files will be generated - as ogldump
+	less than 5k of .stl files will be generated - as ogldump
 	doesn't check for redundancy, so there are likely many duplicates
 	in your newly generated .stl files. to remove them run the script
 	del_stl_duplicates.sh
@@ -74,6 +77,6 @@ TODO
 
 BUGS
 ~~~~
-sauerbraten:
-!!! unsupported new_VertexPointer() type 5122
+	often objects are empty, not sure why.
+	render_stl.py is really experimental. it's in bad need of a autozoom function.
 
