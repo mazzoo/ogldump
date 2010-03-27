@@ -20,17 +20,18 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 
-#define DUMP_COUNT 5000
+#define DUMP_COUNT 50000
 static uint32_t dump_count = 0;
 
-//#define VERBOSE
+#define VERBOSE
 #ifdef VERBOSE
 #  define verbprintf printf
 #else
 #  define verbprintf(x,...)
 #endif
 
-#define FNAME_PREFIX "/home/matze/CODE/ogldump/data"
+#define FNAME_PREFIX "/home/matze/CODE/ogldump/ogldump_data"
+
 char stl_header[80] =
 	"Hi stranger. I am the STL header, "
 	"my contents are pointless, "
@@ -865,7 +866,8 @@ void ogldump_exit(void)
 	int large=0;
 	struct prim_t * p = all_prims;
 	while (p) {
-		if (p->nV3 > 256) {
+//		if (p->nV3 > 256) {
+		if (p->nV3 > 8) {
 //		if (p->nV3 > 0) {
 			printf("+++ prim %d has %d vertices\n", n, p->nV3);
 			large++;
@@ -1570,6 +1572,7 @@ void glDrawElements( GLenum mode, GLsizei count,
 }
 #endif
 
+#if 1
 /* omit Vertec Buffer Objects by returning an incompatible version  */
 /* FIXME it's a dirty hack, supporting VBOs would be the real thing */
 const GLubyte * glGetString( GLenum name )
@@ -1587,6 +1590,16 @@ const GLubyte * glGetString( GLenum name )
 					func(name));
 			return (const GLubyte *) "";
 			break;
+		case GL_VENDOR:
+			verbprintf("\tGL_VENDOR:we return \"\" instead of %s\n",
+					func(name));
+			return (const GLubyte *) "";
+			break;
+		case GL_RENDERER:
+			verbprintf("\tGL_RENDERER:we return \"\" instead of %s\n",
+					func(name));
+			return (const GLubyte *) "";
+			break;
 		case GL_VERSION:
 			verbprintf("\tGL_VERSION: we return \"\" instead of %s\n",
 					func(name));
@@ -1596,4 +1609,5 @@ const GLubyte * glGetString( GLenum name )
 			return func(name);
 	}
 }
+#endif
 

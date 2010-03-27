@@ -39,6 +39,14 @@ running
 STL tools
 ~~~~~~~~~
 
+	stl_norm inputfile(s).stl
+		normalize stl files
+		move stl object centered around the x and y zero axis,
+		and above the z axis (positive z values only)
+		scale object to fit in a bounding box
+		[-BB_SZ/2, BB_SZ/2] [-BB_SZ/2, BB_SZ/2] [0, BB_SZ]
+		BB_SZ is currently #defined to 4.0
+
 	stl_process [options] inputfile(s).stl
 		will always output a single out.stl file, combining one or
 		multiple stl input files.

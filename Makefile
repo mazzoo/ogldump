@@ -1,6 +1,6 @@
 CFLAGS=-Wall -g
 
-all: ogldump.so stl_process stl_bin2ascii
+all: ogldump.so stl_process stl_bin2ascii stl_norm
 
 
 ogldump.so:ogldump.c
