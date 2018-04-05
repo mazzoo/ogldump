@@ -73,6 +73,17 @@ STL tools
         RENDER_STL="`echo ${PWD}/data/*.stl`" blender -P render_stl.py
 
 
+environment variables
+~~~~~~~~~~~~~~~~~~~~~
+    there are some environment variables you can optionally set to control
+    where to and when and how much ogldump dumps.
+
+    OGLDUMP_DIR          - directory where STLs wit be dumped to, defaults to
+                           /var/tmp/ogldump_data
+    OGLDUMP_DUMP_COUNT   - number of elements to dump, defaults to 50000
+    OGLDUMP_DUMP_INSTANT - set to 1 to dump instantly from startup, and
+                           not have SIGUSR2 trigger dumping
+
 TODO
 ~~~~
     wrap more OpenGL functions

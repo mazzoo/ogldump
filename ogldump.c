@@ -24,8 +24,9 @@
 #include <GL/gl.h>
 #include <GL/glx.h>
 
-#define DUMP_COUNT 50000
-static uint32_t dump_count = 0;
+#define DUMP_COUNT_DEFAULT 50000
+uint32_t DUMP_COUNT = DUMP_COUNT_DEFAULT;
+uint32_t dump_count = 0;
 
 #define VERBOSE
 #ifdef VERBOSE
@@ -881,66 +882,74 @@ void ogldump_exit(void)
         }
         n++;
         p = p->next;
-        }
-
-        do_DrawElements();
-
-        printf("+++ wrote a total of %d prims\n", large);
-        printf("+++ byebye from ogldump.\n\n");
     }
 
-    void sig_usr2_handler(int s)
+    do_DrawElements();
+
+    printf("+++ wrote a total of %d prims\n", large);
+    printf("+++ byebye from ogldump.\n\n");
+}
+
+void sig_usr2_handler(int s)
+{
+    if (s != SIGUSR2)
+        return;
+    dump_count = DUMP_COUNT;
+}
+
+static int is_initialized = 0;
+
+static inline void init(void)
+{
+    if (is_initialized)
+        return;
+
+    if (getenv("OGLDUMP_DIR"))
+        FNAME_PREFIX = getenv("OGLDUMP_DIR");
+    if (mkdir(FNAME_PREFIX, 0660) < 0)
     {
-        if (s != SIGUSR2)
-            return;
-        if (!dump_count)
-            dump_count = DUMP_COUNT;
-    }
-
-    static int is_initialized = 0;
-
-    static inline void init(void)
-    {
-        if (is_initialized)
-            return;
-
-        if (getenv("OGLDUMP_DIR"))
-            FNAME_PREFIX = getenv("OGLDUMP_DIR");
-        if (mkdir(FNAME_PREFIX, 0660) < 0)
+        if (errno != EEXIST)
         {
-            if (errno != EEXIST)
-            {
-                printf("!!! ERROR creating %s: %s\n", FNAME_PREFIX, strerror(errno));
-                exit(1);
-            }
+            printf("!!! ERROR creating %s: %s\n", FNAME_PREFIX, strerror(errno));
+            exit(1);
         }
-        printf("+++ dumping to dir %s\n", FNAME_PREFIX);
+    }
+    printf("+++ dumping to dir %s\n", FNAME_PREFIX);
 
-        atexit(ogldump_exit);
-
-        all_prims         = NULL;
-        norm              = NULL;
-        norm_last         = NULL;
-        drawelements      = NULL;
-        all_drawelements  = NULL;
-        all_vertexpointer = NULL;
-        vertexpointer     = NULL;
-
-        /* an initial default normal */
-        new_N3(0.0, 0.0, 1.0);
-
-        sighandler_t rets = signal(SIGUSR2, sig_usr2_handler);
-        if (rets == SIG_ERR)
-            printf("!!! installing sig_usr2_handler() failed\n");
-        else
-            printf("+++ installed sig_usr2_handler()\n");
-
-
-        is_initialized++;
+    if (getenv("OGLDUMP_DUMP_COUNT"))
+    {
+        DUMP_COUNT = getenv("OGLDUMP_DUMP_COUNT");
     }
 
-    /**************************************************************/
-    /* hijacked functions */
+    if (getenv("OGLDUMP_DUMP_INSTANT") == 1)
+    {
+        dump_count = DUMP_COUNT;
+    }
+
+    atexit(ogldump_exit);
+
+    all_prims         = NULL;
+    norm              = NULL;
+    norm_last         = NULL;
+    drawelements      = NULL;
+    all_drawelements  = NULL;
+    all_vertexpointer = NULL;
+    vertexpointer     = NULL;
+
+    /* an initial default normal */
+    new_N3(0.0, 0.0, 1.0);
+
+    sighandler_t rets = signal(SIGUSR2, sig_usr2_handler);
+    if (rets == SIG_ERR)
+        printf("!!! installing sig_usr2_handler() failed\n");
+    else
+        printf("+++ installed sig_usr2_handler()\n");
+
+    is_initialized++;
+}
+
+/**************************************************************/
+/* hijacked functions */
 
 #if 0
     int __libc_start_main(
@@ -952,681 +961,681 @@ void ogldump_exit(void)
             void (*rtld_fini) (void),
             void (* stack_end)
             )
-    {
-        init();
-    }
+{
+    init();
+}
 #endif
 
 #if 0
-    sighandler_t signal(int signum, sighandler_t handler)
-    {
-        static sighandler_t (*func)(int, sighandler_t) = NULL;
-        if (!func)
-            func = (sighandler_t (*)(int, sighandler_t)) dlsym(RTLD_NEXT, "signal");
+sighandler_t signal(int signum, sighandler_t handler)
+{
+    static sighandler_t (*func)(int, sighandler_t) = NULL;
+    if (!func)
+        func = (sighandler_t (*)(int, sighandler_t)) dlsym(RTLD_NEXT, "signal");
 
-        if (signum == SIGUSR2)
-        {
-            printf("+++ recording %d OpenGL calls\n", DUMP_COUNT);
-            init();
-            dump_count = DUMP_COUNT;
-        }else
-            return func(signum, handler);
-    }
+    if (signum == SIGUSR2)
+    {
+        printf("+++ recording %d OpenGL calls\n", DUMP_COUNT);
+        init();
+        dump_count = DUMP_COUNT;
+    }else
+        return func(signum, handler);
+}
 #endif
 
 
-    //#define DO_2D_VERTEX
+//#define DO_2D_VERTEX
 #define DO_3D_VERTEX
-    //#define DO_4D_VERTEX
+//#define DO_4D_VERTEX
 #define DO_3D_NORMAL /* should alway be on */
 #define DO_DRAW_ELEMENTS
 
 #define glvoid __attribute__((visibility("default"))) void
 
 #if 0
-    glvoid glNewList( GLuint list, GLenum mode )
-    {
-        init();
-        static void (*func)(GLuint, GLenum) = NULL;
-        if (!func)
-            func = (void (*)(GLuint, GLenum)) dlsym(RTLD_NEXT, "glNewList");
+glvoid glNewList( GLuint list, GLenum mode )
+{
+    init();
+    static void (*func)(GLuint, GLenum) = NULL;
+    if (!func)
+        func = (void (*)(GLuint, GLenum)) dlsym(RTLD_NEXT, "glNewList");
 
-        verbprintf("glNewList(%d, %d);\n", list, mode);
+    verbprintf("glNewList(%d, %d);\n", list, mode);
 
-        func(list, mode);
-    }
+    func(list, mode);
+}
 #endif
 
 #if defined DO_2D_VERTEX || defined DO_3D_VERTEX || defined DO_4D_VERTEX
-    glvoid glBegin( GLenum mode )
+glvoid glBegin( GLenum mode )
+{
+    init();
+    static void (*func)(GLenum) = NULL;
+    if (!func)
+        func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glBegin");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLenum) = NULL;
-        if (!func)
-            func = (void (*)(GLenum)) dlsym(RTLD_NEXT, "glBegin");
+        verbprintf("glBegin(%s);", prim_type_name[mode]);
 
-        if (dump_count)
-        {
-            verbprintf("glBegin(%s);", prim_type_name[mode]);
+        current_prim = new_prim(mode);
 
-            current_prim = new_prim(mode);
-
-            verbprintf(" /* [%d] */\n", nPrim-1);
-            dump_count--;
-        }
-
-        func(mode);
+        verbprintf(" /* [%d] */\n", nPrim-1);
+        dump_count--;
     }
 
-    glvoid glEnd( void )
+    func(mode);
+}
+
+glvoid glEnd( void )
+{
+    init();
+    static void (*func)(void) = NULL;
+    if (!func)
+        func = (void (*)(void)) dlsym(RTLD_NEXT, "glEnd");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(void) = NULL;
-        if (!func)
-            func = (void (*)(void)) dlsym(RTLD_NEXT, "glEnd");
+        verbprintf("glEnd();\n");
 
-        if (dump_count)
-        {
-            verbprintf("glEnd();\n");
-
-            current_prim = NULL;
-            dump_count--;
-        }
-
-        func();
+        current_prim = NULL;
+        dump_count--;
     }
+
+    func();
+}
 #endif
 
 #ifdef DO_2D_VERTEX
-    glvoid glVertex2d( GLdouble x, GLdouble y )
-    {
-        init();
-        static void (*func)(GLdouble, GLdouble) = NULL;
-        if (!func)
-            func = (void (*)(GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex2d");
+glvoid glVertex2d( GLdouble x, GLdouble y )
+{
+    init();
+    static void (*func)(GLdouble, GLdouble) = NULL;
+    if (!func)
+        func = (void (*)(GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex2d");
 
-        verbprintf("glVertex2d(%f, %f);\n", x, y);
+    verbprintf("glVertex2d(%f, %f);\n", x, y);
 
-        func(x, y);
-    }
+    func(x, y);
+}
 
-    glvoid glVertex2f( GLfloat x, GLfloat y )
-    {
-        init();
-        static void (*func)(GLfloat, GLfloat) = NULL;
-        if (!func)
-            func = (void (*)(GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex2f");
+glvoid glVertex2f( GLfloat x, GLfloat y )
+{
+    init();
+    static void (*func)(GLfloat, GLfloat) = NULL;
+    if (!func)
+        func = (void (*)(GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex2f");
 
-        verbprintf("glVertex2f(%f, %f);\n", x, y);
+    verbprintf("glVertex2f(%f, %f);\n", x, y);
 
-        func(x, y);
-    }
+    func(x, y);
+}
 
-    glvoid glVertex2i( GLint x, GLint y )
-    {
-        init();
-        static void (*func)(GLint, GLint) = NULL;
-        if (!func)
-            func = (void (*)(GLint, GLint)) dlsym(RTLD_NEXT, "glVertex2i");
+glvoid glVertex2i( GLint x, GLint y )
+{
+    init();
+    static void (*func)(GLint, GLint) = NULL;
+    if (!func)
+        func = (void (*)(GLint, GLint)) dlsym(RTLD_NEXT, "glVertex2i");
 
-        verbprintf("glVertex2i(%d, %d);\n", x, y);
+    verbprintf("glVertex2i(%d, %d);\n", x, y);
 
-        func(x, y);
-    }
+    func(x, y);
+}
 
-    glvoid glVertex2s( GLshort x, GLshort y )
-    {
-        init();
-        static void (*func)(GLshort, GLshort) = NULL;
-        if (!func)
-            func = (void (*)(GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex2s");
+glvoid glVertex2s( GLshort x, GLshort y )
+{
+    init();
+    static void (*func)(GLshort, GLshort) = NULL;
+    if (!func)
+        func = (void (*)(GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex2s");
 
-        verbprintf("glVertex2s(%d, %d);\n", x, y);
+    verbprintf("glVertex2s(%d, %d);\n", x, y);
 
-        func(x, y);
-    }
+    func(x, y);
+}
 #endif
 
 #ifdef DO_3D_VERTEX
-    glvoid glVertex3d( GLdouble x, GLdouble y, GLdouble z )
+glvoid glVertex3d( GLdouble x, GLdouble y, GLdouble z )
+{
+    init();
+    static void (*func)(GLdouble, GLdouble, GLdouble) = NULL;
+    if (!func)
+        func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex3d");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLdouble, GLdouble, GLdouble) = NULL;
-        if (!func)
-            func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex3d");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3d(%f, %f, %f);\n", x, y, z);
-            new_V3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glVertex3d(%f, %f, %f);\n", x, y, z);
+        new_V3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glVertex3f( GLfloat x, GLfloat y, GLfloat z )
+    func(x, y, z);
+}
+
+glvoid glVertex3f( GLfloat x, GLfloat y, GLfloat z )
+{
+    init();
+    static void (*func)(GLfloat, GLfloat, GLfloat) = NULL;
+    if (!func)
+        func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex3f");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLfloat, GLfloat, GLfloat) = NULL;
-        if (!func)
-            func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex3f");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3f(%f, %f, %f);\n", x, y, z);
-            new_V3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glVertex3f(%f, %f, %f);\n", x, y, z);
+        new_V3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glVertex3i( GLint x, GLint y, GLint z )
+    func(x, y, z);
+}
+
+glvoid glVertex3i( GLint x, GLint y, GLint z )
+{
+    init();
+    static void (*func)(GLint, GLint, GLint) = NULL;
+    if (!func)
+        func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex3i");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLint, GLint, GLint) = NULL;
-        if (!func)
-            func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex3i");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3i(%d, %d, %d);\n", x, y, z);
-            new_V3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glVertex3i(%d, %d, %d);\n", x, y, z);
+        new_V3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glVertex3s( GLshort x, GLshort y, GLshort z )
+    func(x, y, z);
+}
+
+glvoid glVertex3s( GLshort x, GLshort y, GLshort z )
+{
+    init();
+    static void (*func)(GLshort, GLshort, GLshort) = NULL;
+    if (!func)
+        func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex3s");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLshort, GLshort, GLshort) = NULL;
-        if (!func)
-            func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex3s");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3s(%d, %d, %d);\n", x, y, z);
-            new_V3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glVertex3s(%d, %d, %d);\n", x, y, z);
+        new_V3(x, y, z);
+        dump_count--;
     }
+
+    func(x, y, z);
+}
 #endif
 
 #ifdef DO_4D_VERTEX
-    glvoid glVertex4d( GLdouble x, GLdouble y, GLdouble z, GLdouble w )
-    {
-        init();
-        static void (*func)(GLdouble, GLdouble, GLdouble, GLdouble) = NULL;
-        if (!func)
-            func = (void (*)(GLdouble, GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex4d");
+glvoid glVertex4d( GLdouble x, GLdouble y, GLdouble z, GLdouble w )
+{
+    init();
+    static void (*func)(GLdouble, GLdouble, GLdouble, GLdouble) = NULL;
+    if (!func)
+        func = (void (*)(GLdouble, GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glVertex4d");
 
-        verbprintf("glVertex4d(%f, %f, %f, %f);\n", x, y, z, w);
+    verbprintf("glVertex4d(%f, %f, %f, %f);\n", x, y, z, w);
 
-        func(x, y, z, w);
-    }
+    func(x, y, z, w);
+}
 
-    glvoid glVertex4f( GLfloat x, GLfloat y, GLfloat z, GLfloat w )
-    {
-        init();
-        static void (*func)(GLfloat, GLfloat, GLfloat, GLfloat) = NULL;
-        if (!func)
-            func = (void (*)(GLfloat, GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex4f");
+glvoid glVertex4f( GLfloat x, GLfloat y, GLfloat z, GLfloat w )
+{
+    init();
+    static void (*func)(GLfloat, GLfloat, GLfloat, GLfloat) = NULL;
+    if (!func)
+        func = (void (*)(GLfloat, GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glVertex4f");
 
-        verbprintf("glVertex4f(%f, %f, %f, %f);\n", x, y, z, w);
+    verbprintf("glVertex4f(%f, %f, %f, %f);\n", x, y, z, w);
 
-        func(x, y, z, w);
-    }
+    func(x, y, z, w);
+}
 
-    glvoid glVertex4i( GLint x, GLint y, GLint z, GLint w )
-    {
-        init();
-        static void (*func)(GLint, GLint, GLint, GLint) = NULL;
-        if (!func)
-            func = (void (*)(GLint, GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex4i");
+glvoid glVertex4i( GLint x, GLint y, GLint z, GLint w )
+{
+    init();
+    static void (*func)(GLint, GLint, GLint, GLint) = NULL;
+    if (!func)
+        func = (void (*)(GLint, GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glVertex4i");
 
-        verbprintf("glVertex4i(%d, %d, %d, %d);\n", x, y, z, w);
+    verbprintf("glVertex4i(%d, %d, %d, %d);\n", x, y, z, w);
 
-        func(x, y, z, w);
-    }
+    func(x, y, z, w);
+}
 
-    glvoid glVertex4s( GLshort x, GLshort y, GLshort z, GLshort w )
-    {
-        init();
-        static void (*func)(GLshort, GLshort, GLshort, GLshort) = NULL;
-        if (!func)
-            func = (void (*)(GLshort, GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex4s");
+glvoid glVertex4s( GLshort x, GLshort y, GLshort z, GLshort w )
+{
+    init();
+    static void (*func)(GLshort, GLshort, GLshort, GLshort) = NULL;
+    if (!func)
+        func = (void (*)(GLshort, GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glVertex4s");
 
-        verbprintf("glVertex4s(%d, %d, %d, %d);\n", x, y, z, w);
+    verbprintf("glVertex4s(%d, %d, %d, %d);\n", x, y, z, w);
 
-        func(x, y, z, w);
-    }
+    func(x, y, z, w);
+}
 #endif
 
 #ifdef DO_2D_VERTEX
-    glvoid glVertex2dv( const GLdouble *v )
-    {
-        init();
-        static void (*func)(const GLdouble *) = NULL;
-        if (!func)
-            func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex2dv");
+glvoid glVertex2dv( const GLdouble *v )
+{
+    init();
+    static void (*func)(const GLdouble *) = NULL;
+    if (!func)
+        func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex2dv");
 
-        verbprintf("glVertex2dv(%f, %f);\n", v[0], v[1]);
+    verbprintf("glVertex2dv(%f, %f);\n", v[0], v[1]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex2fv( const GLfloat *v )
-    {
-        init();
-        static void (*func)(const GLfloat *) = NULL;
-        if (!func)
-            func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex2fv");
+glvoid glVertex2fv( const GLfloat *v )
+{
+    init();
+    static void (*func)(const GLfloat *) = NULL;
+    if (!func)
+        func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex2fv");
 
-        verbprintf("glVertex2fv(%f, %f);\n", v[0], v[1]);
+    verbprintf("glVertex2fv(%f, %f);\n", v[0], v[1]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex2iv( const GLint *v )
-    {
-        init();
-        static void (*func)(const GLint *) = NULL;
-        if (!func)
-            func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex2iv");
+glvoid glVertex2iv( const GLint *v )
+{
+    init();
+    static void (*func)(const GLint *) = NULL;
+    if (!func)
+        func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex2iv");
 
-        verbprintf("glVertex2iv(%d, %d);\n", v[0], v[1]);
+    verbprintf("glVertex2iv(%d, %d);\n", v[0], v[1]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex2sv( const GLshort *v )
-    {
-        init();
-        static void (*func)(const GLshort *) = NULL;
-        if (!func)
-            func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex2sv");
+glvoid glVertex2sv( const GLshort *v )
+{
+    init();
+    static void (*func)(const GLshort *) = NULL;
+    if (!func)
+        func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex2sv");
 
-        verbprintf("glVertex2sv(%d, %d);\n", v[0], v[1]);
+    verbprintf("glVertex2sv(%d, %d);\n", v[0], v[1]);
 
-        func(v);
-    }
+    func(v);
+}
 #endif
 
 #ifdef DO_3D_VERTEX
-    glvoid glVertex3dv( const GLdouble *v )
+glvoid glVertex3dv( const GLdouble *v )
+{
+    init();
+    static void (*func)(const GLdouble *) = NULL;
+    if (!func)
+        func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex3dv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLdouble *) = NULL;
-        if (!func)
-            func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex3dv");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
-            new_V3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glVertex3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+        new_V3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glVertex3fv( const GLfloat *v )
+    func(v);
+}
+
+glvoid glVertex3fv( const GLfloat *v )
+{
+    init();
+    static void (*func)(const GLfloat *) = NULL;
+    if (!func)
+        func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex3fv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLfloat *) = NULL;
-        if (!func)
-            func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex3fv");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
-            new_V3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glVertex3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+        new_V3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glVertex3iv( const GLint *v )
+    func(v);
+}
+
+glvoid glVertex3iv( const GLint *v )
+{
+    init();
+    static void (*func)(const GLint *) = NULL;
+    if (!func)
+        func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex3iv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLint *) = NULL;
-        if (!func)
-            func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex3iv");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
-            new_V3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glVertex3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+        new_V3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glVertex3sv( const GLshort *v )
+    func(v);
+}
+
+glvoid glVertex3sv( const GLshort *v )
+{
+    init();
+    static void (*func)(const GLshort *) = NULL;
+    if (!func)
+        func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex3sv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLshort *) = NULL;
-        if (!func)
-            func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex3sv");
-
-        if (dump_count)
-        {
-            verbprintf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
-            new_V3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glVertex3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+        new_V3(v[0], v[1], v[2]);
+        dump_count--;
     }
+
+    func(v);
+}
 #endif
 
 #ifdef DO_4D_VERTEX
-    glvoid glVertex4dv( const GLdouble *v )
-    {
-        init();
-        static void (*func)(const GLdouble *) = NULL;
-        if (!func)
-            func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex4dv");
+glvoid glVertex4dv( const GLdouble *v )
+{
+    init();
+    static void (*func)(const GLdouble *) = NULL;
+    if (!func)
+        func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glVertex4dv");
 
-        verbprintf("glVertex4dv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
+    verbprintf("glVertex4dv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex4fv( const GLfloat *v )
-    {
-        init();
-        static void (*func)(const GLfloat *) = NULL;
-        if (!func)
-            func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex4fv");
+glvoid glVertex4fv( const GLfloat *v )
+{
+    init();
+    static void (*func)(const GLfloat *) = NULL;
+    if (!func)
+        func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glVertex4fv");
 
-        verbprintf("glVertex4fv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
+    verbprintf("glVertex4fv(%f, %f, %f, %f);\n", v[0], v[1], v[2], v[4]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex4iv( const GLint *v )
-    {
-        init();
-        static void (*func)(const GLint *) = NULL;
-        if (!func)
-            func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex4iv");
+glvoid glVertex4iv( const GLint *v )
+{
+    init();
+    static void (*func)(const GLint *) = NULL;
+    if (!func)
+        func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glVertex4iv");
 
-        verbprintf("glVertex4iv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
+    verbprintf("glVertex4iv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
 
-        func(v);
-    }
+    func(v);
+}
 
-    glvoid glVertex4sv( const GLshort *v )
-    {
-        init();
-        static void (*func)(const GLshort *) = NULL;
-        if (!func)
-            func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex4sv");
+glvoid glVertex4sv( const GLshort *v )
+{
+    init();
+    static void (*func)(const GLshort *) = NULL;
+    if (!func)
+        func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glVertex4sv");
 
-        verbprintf("glVertex4sv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
+    verbprintf("glVertex4sv(%d, %d, %d, %d);\n", v[0], v[1], v[2], v[4]);
 
-        func(v);
-    }
+    func(v);
+}
 #endif
 
 #ifdef DO_3D_NORMAL
-    glvoid glNormal3b( GLbyte x, GLbyte y, GLbyte z )
+glvoid glNormal3b( GLbyte x, GLbyte y, GLbyte z )
+{
+    init();
+    static void (*func)(GLbyte, GLbyte, GLbyte) = NULL;
+    if (!func)
+        func = (void (*)(GLbyte, GLbyte, GLbyte)) dlsym(RTLD_NEXT, "glNormal3b");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLbyte, GLbyte, GLbyte) = NULL;
-        if (!func)
-            func = (void (*)(GLbyte, GLbyte, GLbyte)) dlsym(RTLD_NEXT, "glNormal3b");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3b(%d, %d, %d);\n", x, y, z);
-            new_N3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glNormal3b(%d, %d, %d);\n", x, y, z);
+        new_N3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glNormal3d( GLdouble x, GLdouble y, GLdouble z )
+    func(x, y, z);
+}
+
+glvoid glNormal3d( GLdouble x, GLdouble y, GLdouble z )
+{
+    init();
+    static void (*func)(GLdouble, GLdouble, GLdouble) = NULL;
+    if (!func)
+        func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glNormal3d");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLdouble, GLdouble, GLdouble) = NULL;
-        if (!func)
-            func = (void (*)(GLdouble, GLdouble, GLdouble)) dlsym(RTLD_NEXT, "glNormal3d");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3d(%f, %f, %f);\n", x, y, z);
-            new_N3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glNormal3d(%f, %f, %f);\n", x, y, z);
+        new_N3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glNormal3f( GLfloat x, GLfloat y, GLfloat z )
+    func(x, y, z);
+}
+
+glvoid glNormal3f( GLfloat x, GLfloat y, GLfloat z )
+{
+    init();
+    static void (*func)(GLfloat, GLfloat, GLfloat) = NULL;
+    if (!func)
+        func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glNormal3f");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLfloat, GLfloat, GLfloat) = NULL;
-        if (!func)
-            func = (void (*)(GLfloat, GLfloat, GLfloat)) dlsym(RTLD_NEXT, "glNormal3f");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3f(%f, %f, %f);\n", x, y, z);
-            new_N3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glNormal3f(%f, %f, %f);\n", x, y, z);
+        new_N3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glNormal3i( GLint x, GLint y, GLint z )
+    func(x, y, z);
+}
+
+glvoid glNormal3i( GLint x, GLint y, GLint z )
+{
+    init();
+    static void (*func)(GLint, GLint, GLint) = NULL;
+    if (!func)
+        func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glNormal3i");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLint, GLint, GLint) = NULL;
-        if (!func)
-            func = (void (*)(GLint, GLint, GLint)) dlsym(RTLD_NEXT, "glNormal3i");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3i(%d, %d, %d);\n", x, y, z);
-            new_N3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glNormal3i(%d, %d, %d);\n", x, y, z);
+        new_N3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glNormal3s( GLshort x, GLshort y, GLshort z )
+    func(x, y, z);
+}
+
+glvoid glNormal3s( GLshort x, GLshort y, GLshort z )
+{
+    init();
+    static void (*func)(GLshort, GLshort, GLshort) = NULL;
+    if (!func)
+        func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glNormal3s");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLshort, GLshort, GLshort) = NULL;
-        if (!func)
-            func = (void (*)(GLshort, GLshort, GLshort)) dlsym(RTLD_NEXT, "glNormal3s");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3s(%d, %d, %d);\n", x, y, z);
-            new_N3(x, y, z);
-            dump_count--;
-        }
-
-        func(x, y, z);
+        verbprintf("glNormal3s(%d, %d, %d);\n", x, y, z);
+        new_N3(x, y, z);
+        dump_count--;
     }
 
-    glvoid glNormal3bv( const GLbyte *v )
+    func(x, y, z);
+}
+
+glvoid glNormal3bv( const GLbyte *v )
+{
+    init();
+    static void (*func)(const GLbyte *) = NULL;
+    if (!func)
+        func = (void (*)(const GLbyte *)) dlsym(RTLD_NEXT, "glNormal3bv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLbyte *) = NULL;
-        if (!func)
-            func = (void (*)(const GLbyte *)) dlsym(RTLD_NEXT, "glNormal3bv");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
-            new_N3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glNormal3bv(%d, %d, %d);\n", v[0], v[1], v[2]);
+        new_N3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glNormal3dv( const GLdouble *v )
+    func(v);
+}
+
+glvoid glNormal3dv( const GLdouble *v )
+{
+    init();
+    static void (*func)(const GLdouble *) = NULL;
+    if (!func)
+        func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glNormal3dv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLdouble *) = NULL;
-        if (!func)
-            func = (void (*)(const GLdouble *)) dlsym(RTLD_NEXT, "glNormal3dv");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
-            new_N3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glNormal3dv(%f, %f, %f);\n", v[0], v[1], v[2]);
+        new_N3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glNormal3fv( const GLfloat *v )
+    func(v);
+}
+
+glvoid glNormal3fv( const GLfloat *v )
+{
+    init();
+    static void (*func)(const GLfloat *) = NULL;
+    if (!func)
+        func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glNormal3fv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLfloat *) = NULL;
-        if (!func)
-            func = (void (*)(const GLfloat *)) dlsym(RTLD_NEXT, "glNormal3fv");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
-            new_N3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glNormal3fv(%f, %f, %f);\n", v[0], v[1], v[2]);
+        new_N3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glNormal3iv( const GLint *v )
+    func(v);
+}
+
+glvoid glNormal3iv( const GLint *v )
+{
+    init();
+    static void (*func)(const GLint *) = NULL;
+    if (!func)
+        func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glNormal3iv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLint *) = NULL;
-        if (!func)
-            func = (void (*)(const GLint *)) dlsym(RTLD_NEXT, "glNormal3iv");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
-            new_N3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glNormal3iv(%d, %d, %d);\n", v[0], v[1], v[2]);
+        new_N3(v[0], v[1], v[2]);
+        dump_count--;
     }
 
-    glvoid glNormal3sv( const GLshort *v )
+    func(v);
+}
+
+glvoid glNormal3sv( const GLshort *v )
+{
+    init();
+    static void (*func)(const GLshort *) = NULL;
+    if (!func)
+        func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glNormal3sv");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(const GLshort *) = NULL;
-        if (!func)
-            func = (void (*)(const GLshort *)) dlsym(RTLD_NEXT, "glNormal3sv");
-
-        if (dump_count)
-        {
-            verbprintf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
-            new_N3(v[0], v[1], v[2]);
-            dump_count--;
-        }
-
-        func(v);
+        verbprintf("glNormal3sv(%d, %d, %d);\n", v[0], v[1], v[2]);
+        new_N3(v[0], v[1], v[2]);
+        dump_count--;
     }
+
+    func(v);
+}
 #endif
 
 
 #ifdef DO_DRAW_ELEMENTS
-    void glVertexPointer( GLint size, GLenum type,
-            GLsizei stride, const GLvoid *ptr )
+void glVertexPointer( GLint size, GLenum type,
+        GLsizei stride, const GLvoid *ptr )
+{
+    init();
+    static void (*func)(GLint, GLenum, GLsizei, const GLvoid *) = NULL;
+    if (!func)
+        func = (void (*)(GLint, GLenum, GLsizei, const GLvoid *)) dlsym(RTLD_NEXT, "glVertexPointer");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLint, GLenum, GLsizei, const GLvoid *) = NULL;
-        if (!func)
-            func = (void (*)(GLint, GLenum, GLsizei, const GLvoid *)) dlsym(RTLD_NEXT, "glVertexPointer");
-
-        if (dump_count)
-        {
-            verbprintf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
-                    size, type, stride, (unsigned int) ptr);
-            new_VertexPointer( size, type, stride, ptr);
-            dump_count--;
-        }
-
-        func(size, type, stride, ptr);
+        verbprintf("glVertexPointer(%d, %d, %d, 0x%8.8x);\n",
+                size, type, stride, (unsigned int) ptr);
+        new_VertexPointer( size, type, stride, ptr);
+        dump_count--;
     }
 
-    void glDrawElements( GLenum mode, GLsizei count,
-            GLenum type, const GLvoid *indices )
+    func(size, type, stride, ptr);
+}
+
+void glDrawElements( GLenum mode, GLsizei count,
+        GLenum type, const GLvoid *indices )
+{
+    init();
+    static void (*func)(GLenum, GLsizei, GLenum, const GLvoid *) = NULL;
+    if (!func)
+        func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
+
+    if (dump_count)
     {
-        init();
-        static void (*func)(GLenum, GLsizei, GLenum, const GLvoid *) = NULL;
-        if (!func)
-            func = (void (*)(GLenum, GLsizei, GLenum, const GLvoid *)) dlsym(RTLD_NEXT, "glDrawElements");
+        verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x); /* [%d] */\n",
+                prim_type_name[mode], count, type, (unsigned int) indices, nDrawElements);
 
-        if (dump_count)
-        {
-            verbprintf("glDrawElements(%s, %d, 0x%x, 0x%8.8x); /* [%d] */\n",
-                    prim_type_name[mode], count, type, (unsigned int) indices, nDrawElements);
-
-            new_DrawElements(mode, count, type, indices);
-            dump_count--;
-        }
-
-        func(mode, count, type, indices);
+        new_DrawElements(mode, count, type, indices);
+        dump_count--;
     }
+
+    func(mode, count, type, indices);
+}
 #endif
 
 #if 1
-    /* omit Vertec Buffer Objects by returning an incompatible version  */
-    /* FIXME it's a dirty hack, supporting VBOs would be the real thing */
-    const GLubyte * glGetString( GLenum name )
-    {
-        init();
-        static const GLubyte * (*func)(GLenum) = NULL;
-        if (!func)
-            func = (const GLubyte * (*)(GLenum)) dlsym(RTLD_NEXT, "glGetString");
+/* omit Vertec Buffer Objects by returning an incompatible version  */
+/* FIXME it's a dirty hack, supporting VBOs would be the real thing */
+const GLubyte * glGetString( GLenum name )
+{
+    init();
+    static const GLubyte * (*func)(GLenum) = NULL;
+    if (!func)
+        func = (const GLubyte * (*)(GLenum)) dlsym(RTLD_NEXT, "glGetString");
 
-        verbprintf("glGetString( %d );\n", name);
+    verbprintf("glGetString( %d );\n", name);
 
-        switch (name){
-            case GL_EXTENSIONS:
-                verbprintf("\tGL_EXTENSIONS:we return \"\" instead of %s\n",
-                        func(name));
-                return (const GLubyte *) "";
-                break;
-            case GL_VENDOR:
-                verbprintf("\tGL_VENDOR:we return \"\" instead of %s\n",
-                        func(name));
-                return (const GLubyte *) "";
-                break;
-            case GL_RENDERER:
-                verbprintf("\tGL_RENDERER:we return \"\" instead of %s\n",
-                        func(name));
-                return (const GLubyte *) "";
-                break;
-            case GL_VERSION:
-                verbprintf("\tGL_VERSION: we return \"\" instead of %s\n",
-                        func(name));
-                return (const GLubyte *) "1.2";
-                break;
-            default:
-                return func(name);
-        }
+    switch (name){
+        case GL_EXTENSIONS:
+            verbprintf("\tGL_EXTENSIONS:we return \"\" instead of %s\n",
+                    func(name));
+            return (const GLubyte *) "";
+            break;
+        case GL_VENDOR:
+            verbprintf("\tGL_VENDOR:we return \"\" instead of %s\n",
+                    func(name));
+            return (const GLubyte *) "";
+            break;
+        case GL_RENDERER:
+            verbprintf("\tGL_RENDERER:we return \"\" instead of %s\n",
+                    func(name));
+            return (const GLubyte *) "";
+            break;
+        case GL_VERSION:
+            verbprintf("\tGL_VERSION: we return \"\" instead of %s\n",
+                    func(name));
+            return (const GLubyte *) "1.2";
+            break;
+        default:
+            return func(name);
     }
+}
 #endif
 
