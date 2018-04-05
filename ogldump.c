@@ -6,16 +6,20 @@
  * published by the Free Software Foundation.
  *
  * authors:
- * (C) 2009  Matthias Wenzel <reprap at mazzoo dot de>
+ * (C) 2009,2018  Matthias Wenzel <reprap at mazzoo dot de>
  *
  */
 
 #define _GNU_SOURCE
-#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <dlfcn.h>
+#include <errno.h>
+
 
 #include <GL/gl.h>
 #include <GL/glx.h>
@@ -30,7 +34,8 @@ static uint32_t dump_count = 0;
 #  define verbprintf(x,...)
 #endif
 
-#define FNAME_PREFIX "/home/matze/CODE/ogldump/ogldump_data"
+#define FNAME_PREFIX_DEFAULT "/var/tmp/ogldump_data"
+char * FNAME_PREFIX = FNAME_PREFIX_DEFAULT;
 
 char stl_header[80] =
 	"Hi stranger. I am the STL header, "
@@ -898,6 +903,19 @@ static inline void init(void)
 {
 	if (is_initialized)
 		return;
+
+	if (getenv("OGLDUMP_DIR"))
+		FNAME_PREFIX = getenv("OGLDUMP_DIR");
+	if (mkdir(FNAME_PREFIX, 0660) < 0)
+	{
+		if (errno != EEXIST)
+		{
+			printf("!!! ERROR creating %s: %s\n", FNAME_PREFIX, strerror(errno));
+			exit(1);
+		}
+	}
+	printf("+++ dumping to dir %s\n", FNAME_PREFIX);
+
 	atexit(ogldump_exit);
 
 	all_prims         = NULL;
@@ -916,6 +934,7 @@ static inline void init(void)
 		printf("!!! installing sig_usr2_handler() failed\n");
 	else
 		printf("+++ installed sig_usr2_handler()\n");
+
 
 	is_initialized++;
 }
