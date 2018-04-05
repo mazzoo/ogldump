@@ -4,87 +4,87 @@ ogldump - record OpenGL calls of any application and export
 authors
 ~~~~~~~
 
-	(c) 2009 Matthias Wenzel (reprap /a/ mazzoo /./ de)
+    (c) 2009 Matthias Wenzel (reprap /a/ mazzoo /./ de)
 
 
 license
 ~~~~~~~
 
-	GPLv2. see file LICENSE
+    GPLv2. see file LICENSE
 
 
 installation
 ~~~~~~~~~~~~
 
-	type "make"
+    type "make"
 
 
 running
 ~~~~~~~
 
-	tpye "export LD_PRELOAD=$PWD/ogldump.so".
-	run your favorite OpenGL application. For starters you may want to
-	try glxgears.
-	get the object you want to rip in front of your eyes.
-	you can now trigger recording 5000 OpenGL calls by sending a
-	USR2 signal to the application, e.g.
-	  killall -USR2 sauerbraten
-	exit the app gracefully (don't kill it, press ctrl-c or alike)
-	less than 5k of .stl files will be generated - as ogldump
-	doesn't check for redundancy, so there are likely many duplicates
-	in your newly generated .stl files. to remove them run the script
-	del_stl_duplicates.sh
+    tpye "export LD_PRELOAD=$PWD/ogldump.so".
+    run your favorite OpenGL application. For starters you may want to
+    try glxgears.
+    get the object you want to rip in front of your eyes.
+    you can now trigger recording 5000 OpenGL calls by sending a
+    USR2 signal to the application, e.g.
+      killall -USR2 sauerbraten
+    exit the app gracefully (don't kill it, press ctrl-c or alike)
+    less than 5k of .stl files will be generated - as ogldump
+    doesn't check for redundancy, so there are likely many duplicates
+    in your newly generated .stl files. to remove them run the script
+    del_stl_duplicates.sh
 
 
 STL tools
 ~~~~~~~~~
 
-	stl_norm inputfile(s).stl
-		normalize stl files
-		move stl object centered around the x and y zero axis,
-		and above the z axis (positive z values only)
-		scale object to fit in a bounding box
-		[-BB_SZ/2, BB_SZ/2] [-BB_SZ/2, BB_SZ/2] [0, BB_SZ]
-		BB_SZ is currently #defined to 4.0
+    stl_norm inputfile(s).stl
+        normalize stl files
+        move stl object centered around the x and y zero axis,
+        and above the z axis (positive z values only)
+        scale object to fit in a bounding box
+        [-BB_SZ/2, BB_SZ/2] [-BB_SZ/2, BB_SZ/2] [0, BB_SZ]
+        BB_SZ is currently #defined to 4.0
 
-	stl_process [options] inputfile(s).stl
-		will always output a single out.stl file, combining one or
-		multiple stl input files.
+    stl_process [options] inputfile(s).stl
+        will always output a single out.stl file, combining one or
+        multiple stl input files.
 
-		options:
-		-s factor : scale output by factor
-		-x x_off  : when merging, add x_off per input file in the output
-		-y y_off  : when merging, add y_off per input file in the output
-		-z z_off  : when merging, add z_off per input file in the output
-		-h        : show help
-
-
-	stl_bin2ascii inputfile.stl
-		convert inputfile.stl in binary STL format to an
-		ascii formatted stl, emitted on stdout
+        options:
+        -s factor : scale output by factor
+        -x x_off  : when merging, add x_off per input file in the output
+        -y y_off  : when merging, add y_off per input file in the output
+        -z z_off  : when merging, add z_off per input file in the output
+        -h        : show help
 
 
-	del_stl_duplicates.sh
-		removes .stl duplicates (identical files) in the $PWD
+    stl_bin2ascii inputfile.stl
+        convert inputfile.stl in binary STL format to an
+        ascii formatted stl, emitted on stdout
 
-	render_stl.py
-		a blender script to render a large number of .stl files to a
-		html website with png images. use like this:
-		RENDER_STL="`echo ${PWD}/data/*.stl`" blender -P render_stl.py
+
+    del_stl_duplicates.sh
+        removes .stl duplicates (identical files) in the $PWD
+
+    render_stl.py
+        a blender script to render a large number of .stl files to a
+        html website with png images. use like this:
+        RENDER_STL="`echo ${PWD}/data/*.stl`" blender -P render_stl.py
 
 
 TODO
 ~~~~
-	wrap more OpenGL functions
-	wrap even more OpenGL functions
-	write a wrapper program for the LD_PRELOAD stuff
-	add options to select which OpenGL functions to wrap
-	add stuff to trigger/start/stop recordings and/or single frames only
-	profile!
+    wrap more OpenGL functions
+    wrap even more OpenGL functions
+    write a wrapper program for the LD_PRELOAD stuff
+    add options to select which OpenGL functions to wrap
+    add stuff to trigger/start/stop recordings and/or single frames only
+    profile!
 
 
 BUGS
 ~~~~
-	often objects are empty, not sure why.
-	render_stl.py is really experimental. it's in bad need of a autozoom function.
+    often objects are empty, not sure why.
+    render_stl.py is really experimental. it's in bad need of a autozoom function.
 
